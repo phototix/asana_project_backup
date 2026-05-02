@@ -1,8 +1,8 @@
 .env
 __pycache__/
 *.pyc
-tmp/
 data/
 files/
+tmp/
 *.zip
 *.log
