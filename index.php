@@ -1,13 +1,138 @@
 <?php
 declare(strict_types=1);
 
+session_start();
+
 $webRoot = __DIR__;
 $dataFile = $webRoot . '/data/backups.json';
 $lastRunFile = $webRoot . '/data/last-run.json';
+$envFile = $webRoot . '/.env';
+$authAttemptsFile = $webRoot . '/data/auth-attempts.json';
 $route = trim((string)($_GET['route'] ?? ''), '/');
+
+function load_env_vars(string $path): array {
+    if (!is_file($path)) {
+        return [];
+    }
+
+    $env = [];
+    $lines = file($path, FILE_IGNORE_NEW_LINES);
+    if (!is_array($lines)) {
+        return [];
+    }
+
+    foreach ($lines as $raw) {
+        $line = trim((string)$raw);
+        if ($line === '' || str_starts_with($line, '#') || strpos($line, '=') === false) {
+            continue;
+        }
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+        if ($key === '') {
+            continue;
+        }
+        $len = strlen($value);
+        if ($len >= 2) {
+            $first = $value[0];
+            $last = $value[$len - 1];
+            if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
+                $value = substr($value, 1, -1);
+            }
+        }
+        $env[$key] = $value;
+    }
+
+    return $env;
+}
 
 function h(string $value): string {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function client_ip(): string {
+    $remoteAddr = trim((string)($_SERVER['REMOTE_ADDR'] ?? ''));
+    return $remoteAddr !== '' ? $remoteAddr : 'unknown';
+}
+
+function auth_attempts_read(string $path): array {
+    $sessionAttempts = is_array($_SESSION['auth_attempts'] ?? null) ? $_SESSION['auth_attempts'] : [];
+    if (!is_file($path)) {
+        return $sessionAttempts;
+    }
+    $decoded = json_decode((string)file_get_contents($path), true);
+    return is_array($decoded) ? $decoded : $sessionAttempts;
+}
+
+function auth_attempts_write(string $path, array $data): void {
+    $_SESSION['auth_attempts'] = $data;
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    @file_put_contents($path, json_encode($data, JSON_UNESCAPED_SLASHES), LOCK_EX);
+}
+
+function auth_attempt_entry(array $allAttempts, string $ip, int $now, int $windowSeconds): array {
+    $entry = is_array($allAttempts[$ip] ?? null) ? $allAttempts[$ip] : [];
+    $failures = is_array($entry['failures'] ?? null) ? $entry['failures'] : [];
+    $recentFailures = [];
+    foreach ($failures as $ts) {
+        $tsInt = (int)$ts;
+        if ($tsInt > 0 && $tsInt >= ($now - $windowSeconds)) {
+            $recentFailures[] = $tsInt;
+        }
+    }
+    return [
+        'failures' => $recentFailures,
+        'locked_until' => max(0, (int)($entry['locked_until'] ?? 0)),
+    ];
+}
+
+function auth_lockout_message(int $remainingSeconds): string {
+    $remainingMinutes = (int)ceil($remainingSeconds / 60);
+    if ($remainingMinutes <= 1) {
+        return 'Too many failed attempts. Try again in about 1 minute.';
+    }
+    return 'Too many failed attempts. Try again in about ' . $remainingMinutes . ' minutes.';
+}
+
+function render_login_page(string $error = ''): void {
+    http_response_code(200);
+    $errorHtml = $error !== '' ? '<p class="error">' . h($error) . '</p>' : '';
+    echo '<!doctype html>';
+    echo '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<title>Login - Asana Backups</title>';
+    echo '<style>';
+    echo 'body{font-family:Georgia,"Times New Roman",serif;background:#f7f4ee;color:#1f1a12;min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0;padding:1.25rem;box-sizing:border-box;}';
+    echo '.card{width:min(420px,100%);background:#fffdf8;border:1px solid #ddd2bf;border-radius:10px;padding:1.1rem 1.2rem;box-shadow:0 10px 30px rgba(31,26,18,.08);}';
+    echo 'h1{margin:0 0 .4rem;font-size:1.35rem;}';
+    echo '.muted{margin:0 0 1rem;color:#6d5f4e;font-size:.95rem;}';
+    echo 'label{display:block;margin:.7rem 0 .35rem;font-size:.92rem;color:#3d301f;}';
+    echo 'input{width:100%;box-sizing:border-box;border:1px solid #d8c9b2;border-radius:7px;padding:.55rem .65rem;background:#fff;color:#1f1a12;}';
+    echo 'button{margin-top:1rem;border:1px solid #c8b79f;background:#7d2b1f;color:#fff;padding:.55rem .9rem;border-radius:7px;cursor:pointer;}';
+    echo 'button:hover{background:#652116;}';
+    echo '.error{border:1px solid #e2b8b0;background:#fff2f0;color:#8c261a;border-radius:7px;padding:.55rem .65rem;margin:.4rem 0 .7rem;}';
+    echo '</style></head><body>';
+    echo '<div class="card"><h1>Login Required</h1><p class="muted">Sign in to access backup files.</p>';
+    echo $errorHtml;
+    echo '<form method="post" action="/login" autocomplete="off">';
+    echo '<label for="username">Username</label><input id="username" name="username" type="text" required autofocus>';
+    echo '<label for="password">Password</label><input id="password" name="password" type="password" required>';
+    echo '<button type="submit">Login</button></form></div></body></html>';
+    exit;
+}
+
+function render_restricted_page(): void {
+    http_response_code(403);
+    echo '<!doctype html>';
+    echo '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<title>Restricted - Asana Backups</title>';
+    echo '<style>body{font-family:Georgia,"Times New Roman",serif;background:#f7f4ee;color:#1f1a12;min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0;padding:1.25rem;box-sizing:border-box;}';
+    echo '.box{width:min(500px,100%);background:#fffdf8;border:1px solid #ddd2bf;border-radius:10px;padding:1.2rem;}';
+    echo 'a{display:inline-block;margin-top:.7rem;color:#fff;background:#7d2b1f;border:1px solid #c8b79f;border-radius:7px;padding:.5rem .8rem;text-decoration:none;}a:hover{background:#652116;}</style>';
+    echo '</head><body><div class="box"><h1>Restricted Page</h1><p>You must log in to access this page.</p><a href="/login">Go to login</a></div></body></html>';
+    exit;
 }
 
 function json_read(string $path): array {
@@ -418,6 +543,88 @@ function render_rich_text(string $html): string {
     return nl2br((string)$clean, false);
 }
 
+$envVars = load_env_vars($envFile);
+$authUsername = trim((string)($envVars['APP_USERNAME'] ?? ''));
+$authPassword = (string)($envVars['APP_PASSWORD'] ?? '');
+$authEnabled = $authUsername !== '' && $authPassword !== '';
+
+if ($route === 'logout') {
+    $_SESSION = [];
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
+    header('Location: /login');
+    exit;
+}
+
+$isAuthenticated = !$authEnabled || (bool)($_SESSION['is_authenticated'] ?? false);
+
+if ($route === 'login') {
+    if (!$authEnabled) {
+        header('Location: /');
+        exit;
+    }
+
+    if ($isAuthenticated) {
+        header('Location: /');
+        exit;
+    }
+
+    $maxFailedAttempts = 5;
+    $attemptWindowSeconds = 15 * 60;
+    $lockoutSeconds = 15 * 60;
+    $now = time();
+    $ip = client_ip();
+    $attempts = auth_attempts_read($authAttemptsFile);
+    $entry = auth_attempt_entry($attempts, $ip, $now, $attemptWindowSeconds);
+
+    if ($entry['locked_until'] > $now) {
+        render_login_page(auth_lockout_message($entry['locked_until'] - $now));
+    }
+
+    $attempts[$ip] = $entry;
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $username = trim((string)($_POST['username'] ?? ''));
+        $password = (string)($_POST['password'] ?? '');
+        if (hash_equals($authUsername, $username) && hash_equals($authPassword, $password)) {
+            session_regenerate_id(true);
+            $_SESSION['is_authenticated'] = true;
+            $_SESSION['auth_username'] = $authUsername;
+            unset($attempts[$ip]);
+            auth_attempts_write($authAttemptsFile, $attempts);
+            header('Location: /');
+            exit;
+        }
+
+        $entry['failures'][] = $now;
+        $entry['failures'] = array_values(array_filter(
+            $entry['failures'],
+            static fn (int $ts): bool => $ts >= ($now - $attemptWindowSeconds)
+        ));
+
+        if (count($entry['failures']) >= $maxFailedAttempts) {
+            $entry['failures'] = [];
+            $entry['locked_until'] = $now + $lockoutSeconds;
+            $attempts[$ip] = $entry;
+            auth_attempts_write($authAttemptsFile, $attempts);
+            render_login_page(auth_lockout_message($lockoutSeconds));
+        }
+
+        $attempts[$ip] = $entry;
+        auth_attempts_write($authAttemptsFile, $attempts);
+        $remaining = max(0, $maxFailedAttempts - count($entry['failures']));
+        $suffix = $remaining > 0 ? ' Attempts left before lockout: ' . $remaining . '.' : '';
+        render_login_page('Invalid username or password.' . $suffix);
+    }
+
+    render_login_page();
+}
+
+if (!$isAuthenticated) {
+    render_restricted_page();
+}
+
 $index = json_read($dataFile);
 $projects = $index['projects'] ?? [];
 $lastRun = json_read($lastRunFile);
@@ -540,6 +747,12 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
 </head>
 <body>
   <h1>Asana Backup Files</h1>
+  <?php if ($authEnabled): ?>
+    <div class="card">
+      Signed in as <strong><?= h((string)($_SESSION['auth_username'] ?? 'user')) ?></strong>
+      <a class="btn" style="margin-left:0.55rem;" href="/logout">Logout</a>
+    </div>
+  <?php endif; ?>
   <?php if ($route === '' && !$isViewerPageRoute && !empty($lastRun)): ?>
     <div class="card">
       <strong>Last Run:</strong> <?= h(format_datetime((string)($lastRun['generated_at'] ?? ''))) ?>
