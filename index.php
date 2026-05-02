@@ -81,6 +81,24 @@ function task_creator_label(array $task): string {
     return 'n/a';
 }
 
+function task_group_label(array $task): string {
+    $memberships = is_array($task['memberships'] ?? null) ? $task['memberships'] : [];
+    $groups = [];
+    foreach ($memberships as $membership) {
+        if (!is_array($membership)) {
+            continue;
+        }
+        $name = trim((string)($membership['section']['name'] ?? ''));
+        if ($name !== '') {
+            $groups[$name] = true;
+        }
+    }
+    if (empty($groups)) {
+        return 'Unsectioned';
+    }
+    return implode(' | ', array_keys($groups));
+}
+
 function local_asset_route(string $projectSlug, string $zipFile, string $assetType, string $taskGid, int $index): string {
     return '/view/' . rawurlencode($projectSlug)
         . '/' . rawurlencode($zipFile)
@@ -397,12 +415,13 @@ function render_rich_text(string $html): string {
     $clean = preg_replace('/\son[a-z]+\s*=\s*"[^"]*"/i', '', (string)$clean);
     $clean = preg_replace('/\son[a-z]+\s*=\s*\'[^\']*\'/i', '', (string)$clean);
     $clean = preg_replace('/\sjavascript:/i', ' ', (string)$clean);
-    return (string)$clean;
+    return nl2br((string)$clean, false);
 }
 
 $index = json_read($dataFile);
 $projects = $index['projects'] ?? [];
 $lastRun = json_read($lastRunFile);
+$isViewerPageRoute = preg_match('#^view/[a-z0-9-]+/[^/]+(?:/task/[0-9]+)?$#', $route) === 1;
 
 if (preg_match('#^download/([a-z0-9-]+)/(.+)$#', $route, $m)) {
     $projectSlug = $m[1];
@@ -474,18 +493,20 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Asana Backups</title>
   <style>
-    body { font-family: Georgia, "Times New Roman", serif; max-width: 1180px; margin: 2rem auto; padding: 0 1rem; background: #f7f4ee; color: #1f1a12; }
+    body { font-family: Georgia, "Times New Roman", serif; width: 100%; margin: 0; padding: 1.25rem; box-sizing: border-box; background: #f7f4ee; color: #1f1a12; }
     a { color: #7d2b1f; text-decoration: none; }
     a:hover { text-decoration: underline; }
     .card { background: #fffdf8; border: 1px solid #ddd2bf; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
     .muted { color: #6d5f4e; }
     table { width: 100%; border-collapse: collapse; }
     th, td { border-bottom: 1px solid #eee2cf; text-align: left; padding: 0.55rem; }
-    .board-wrap { display: flex; gap: 0.9rem; align-items: flex-start; overflow-x: auto; overflow-y: hidden; padding-bottom: 0.35rem; cursor: grab; scroll-behavior: smooth; }
+    .board-wrap { display: flex; gap: 0.9rem; align-items: stretch; overflow-x: auto; overflow-y: hidden; padding: 0.5rem; border: 1px solid #ddd2bf; border-radius: 8px; background: #f6f0e6; cursor: grab; scroll-behavior: smooth; }
     .board-wrap.dragging { cursor: grabbing; user-select: none; }
     .board-col { background: #fffdf8; border: 1px solid #ddd2bf; border-radius: 8px; padding: 0.85rem; flex: 0 0 320px; max-width: 320px; }
+    .board-tasks { overflow: visible; }
     .task-item { border: 1px solid #efe3d0; border-radius: 6px; padding: 0.6rem; margin-bottom: 0.55rem; background: #fff; }
-    .task-item.done { opacity: 0.72; }
+    .task-item.done { border-color: #9fd0ab; background: linear-gradient(180deg, #f3fff3 0%, #e7f8e9 100%); }
+    .task-item.done a { color: #1f6b3a; }
     .rich img { max-width: 100%; height: auto; display: block; margin: 0.7rem auto; }
     .comment { border-top: 1px solid #efe3d0; padding-top: 0.75rem; margin-top: 0.75rem; }
     .tag { display: inline-block; padding: 0.18rem 0.45rem; border-radius: 999px; background: #f0e4d2; color: #6b4c2a; font-size: 0.8rem; }
@@ -507,11 +528,19 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
     .lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); border: 0; background: rgba(255,255,255,0.85); color: #473621; border-radius: 999px; width: 36px; height: 36px; cursor: pointer; }
     .lightbox-nav.left { left: 10px; }
     .lightbox-nav.right { right: 10px; }
+    .view-actions { display: flex; gap: 0.6rem; align-items: center; margin: 0.7rem 0 0.9rem; flex-wrap: wrap; }
+    .btn { display: inline-block; border: 1px solid #d8c9b2; background: #fff; color: #5c3a1f; border-radius: 6px; padding: 0.45rem 0.75rem; text-decoration: none; }
+    .btn:hover { text-decoration: none; background: #f9f2e6; }
+    .search-input { border: 1px solid #d8c9b2; background: #fff; color: #3b2f1f; border-radius: 6px; padding: 0.45rem 0.75rem; min-width: 260px; }
+    .scroll-btn { min-width: 38px; text-align: center; padding: 0.45rem 0.65rem; }
+    .board-top { position: sticky; top: 0; z-index: 20; background: #f7f4ee; padding: 0.2rem 0 0.35rem; }
+    .task-title { margin: 0 0 0.2rem; }
+    .task-subtitle { margin: 0 0 0.85rem; }
   </style>
 </head>
 <body>
   <h1>Asana Backup Files</h1>
-  <?php if (!empty($lastRun)): ?>
+  <?php if ($route === '' && !$isViewerPageRoute && !empty($lastRun)): ?>
     <div class="card">
       <strong>Last Run:</strong> <?= h(format_datetime((string)($lastRun['generated_at'] ?? ''))) ?>
       <br>
@@ -553,14 +582,15 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
       }
       $backups = is_array($selected['backups'] ?? null) ? $selected['backups'] : [];
     ?>
-    <p><a href="/">&larr; Back to projects</a></p>
+    <p><a class="btn" href="/">&larr; Back to projects</a></p>
     <h2><?= h((string)$selected['project_name']) ?> - GID: <?= h((string)$selected['project_gid']) ?></h2>
     <div class="card">
       <table>
         <thead>
           <tr>
             <th>Timestamp</th>
-            <th>ZIP</th>
+            <th>File</th>
+            <th>Download</th>
             <th>View</th>
             <th>Size</th>
             <th>Task Count</th>
@@ -570,8 +600,9 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
         <?php foreach ($backups as $row): ?>
           <tr>
             <td><?= h(format_run_stamp((string)($row['run_stamp'] ?? ''))) ?></td>
-            <td><a href="/download/<?= h($projectSlug) ?>/<?= h((string)$row['zip_file']) ?>"><?= h((string)$row['zip_file']) ?></a></td>
-            <td><a href="/view/<?= h($projectSlug) ?>/<?= h((string)$row['zip_file']) ?>">Open</a></td>
+            <td><a href="/view/<?= h($projectSlug) ?>/<?= h((string)$row['zip_file']) ?>"><?= h((string)$row['zip_file']) ?></a></td>
+            <td><a class="btn" href="/download/<?= h($projectSlug) ?>/<?= h((string)$row['zip_file']) ?>">Download</a></td>
+            <td><a class="btn" href="/view/<?= h($projectSlug) ?>/<?= h((string)$row['zip_file']) ?>">Open</a></td>
             <td><?= h(format_bytes((int)($row['zip_size'] ?? 0))) ?></td>
             <td><?= h((string)($row['counts']['tasks'] ?? '0')) ?></td>
           </tr>
@@ -602,16 +633,21 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
       $tasks = $payload['tasks'];
       $boards = $payload['boards'];
     ?>
-    <p><a href="/project/<?= h($projectSlug) ?>">&larr; Back to project backups</a></p>
-    <h2>Task Board View</h2>
-    <p><a href="/download/<?= h($projectSlug) ?>/<?= h($zipFile) ?>">Download ZIP</a></p>
-    <p>
-      <?php if ($hideCompleted): ?>
-        <a href="/view/<?= h($projectSlug) ?>/<?= h($zipFile) ?>?hide_completed=0">Show completed tasks</a>
-      <?php else: ?>
-        <a href="/view/<?= h($projectSlug) ?>/<?= h($zipFile) ?>?hide_completed=1">Hide completed tasks</a>
-      <?php endif; ?>
-    </p>
+    <div class="board-top">
+      <p><a class="btn" href="/project/<?= h($projectSlug) ?>">&larr; Back to project backups</a></p>
+      <h2>Task Board View</h2>
+      <div class="view-actions">
+        <a class="btn" href="/download/<?= h($projectSlug) ?>/<?= h($zipFile) ?>">Download ZIP</a>
+        <?php if ($hideCompleted): ?>
+          <a class="btn" href="/view/<?= h($projectSlug) ?>/<?= h($zipFile) ?>?hide_completed=0">Show completed tasks</a>
+        <?php else: ?>
+          <a class="btn" href="/view/<?= h($projectSlug) ?>/<?= h($zipFile) ?>?hide_completed=1">Hide completed tasks</a>
+        <?php endif; ?>
+        <button id="scrollLeftBtn" type="button" class="btn scroll-btn" aria-label="Scroll boards left">&lt;</button>
+        <button id="scrollRightBtn" type="button" class="btn scroll-btn" aria-label="Scroll boards right">&gt;</button>
+        <input id="taskSearch" class="search-input" type="search" placeholder="Search task name, GID, creator..." autocomplete="off">
+      </div>
+    </div>
 
     <div class="board-wrap" id="boardWrap">
       <?php foreach ($boards as $board): ?>
@@ -631,25 +667,33 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
           }
         ?>
         <div class="board-col">
-          <h3 style="margin-top:0;"><?= h((string)$section) ?> <span class="tag"><?= h((string)count($visible)) ?></span></h3>
-          <?php if (empty($visible)): ?>
-            <div class="muted">No tasks in this filter.</div>
-          <?php else: ?>
-            <?php foreach ($visible as $task): ?>
-              <?php
-                $taskGid = (string)($task['gid'] ?? '');
-                $done = !empty($task['completed']);
-              ?>
-              <div class="task-item <?= $done ? 'done' : '' ?>">
-                <div><a href="/view/<?= h($projectSlug) ?>/<?= h($zipFile) ?>/task/<?= h($taskGid) ?>"><?= h((string)($task['name'] ?? $taskGid)) ?></a></div>
-                <div class="muted" style="font-size:0.85rem;">Task: <?= h($taskGid) ?><?= $done ? ' | completed' : '' ?></div>
-                <div class="muted" style="font-size:0.82rem;">Creator: <?= h(task_creator_label($task)) ?></div>
-                <div class="muted" style="font-size:0.82rem;">Created: <?= h(format_datetime((string)($task['created_at'] ?? ''))) ?></div>
-                <div class="muted" style="font-size:0.82rem;">Last Modified: <?= h(format_datetime((string)($task['modified_at'] ?? ''))) ?></div>
-              </div>
-            <?php endforeach; ?>
-          <?php endif; ?>
-        </div>
+          <h3 style="margin-top:0;"><?= h((string)$section) ?> <span class="tag board-count"><?= h((string)count($visible)) ?></span></h3>
+          <div class="board-tasks">
+            <?php if (empty($visible)): ?>
+              <div class="muted">No tasks in this filter.</div>
+            <?php else: ?>
+              <?php foreach ($visible as $task): ?>
+                <?php
+                  $taskGid = (string)($task['gid'] ?? '');
+                  $done = !empty($task['completed']);
+                  $searchText = implode(' ', [
+                      (string)($task['name'] ?? ''),
+                      $taskGid,
+                      task_creator_label($task),
+                      (string)($task['notes'] ?? ''),
+                  ]);
+                ?>
+                <div class="task-item <?= $done ? 'done' : '' ?>" data-search="<?= h($searchText) ?>">
+                  <div><a href="/view/<?= h($projectSlug) ?>/<?= h($zipFile) ?>/task/<?= h($taskGid) ?>"><?= h((string)($task['name'] ?? $taskGid)) ?></a></div>
+                  <div class="muted" style="font-size:0.85rem;">Task: <?= h($taskGid) ?><?= $done ? ' | completed' : '' ?></div>
+                  <div class="muted" style="font-size:0.82rem;">Creator: <?= h(task_creator_label($task)) ?></div>
+                  <div class="muted" style="font-size:0.82rem;">Created: <?= h(format_datetime((string)($task['created_at'] ?? ''))) ?></div>
+                  <div class="muted" style="font-size:0.82rem;">Last Modified: <?= h(format_datetime((string)($task['modified_at'] ?? ''))) ?></div>
+                </div>
+              <?php endforeach; ?>
+              <?php endif; ?>
+            </div>
+          </div>
       <?php endforeach; ?>
     </div>
   <?php elseif (preg_match('#^view/([a-z0-9-]+)/([^/]+)/task/([0-9]+)$#', $route, $m)): ?>
@@ -682,8 +726,9 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
       $descriptionText = (string)($task['notes'] ?? '');
       $descriptionHtml = rewrite_asana_asset_links($descriptionHtml, $projectSlug, $zipFile, $taskGid, $attachments);
     ?>
-    <p><a href="/view/<?= h($projectSlug) ?>/<?= h($zipFile) ?>">&larr; Back to board view</a></p>
-    <h2><?= h((string)($task['name'] ?? $taskGid)) ?></h2>
+    <p><a class="btn" href="/view/<?= h($projectSlug) ?>/<?= h($zipFile) ?>">&larr; Back to board view</a></p>
+    <h2 class="task-title"><?= h((string)($task['name'] ?? $taskGid)) ?></h2>
+    <div class="muted task-subtitle"><?= h(task_group_label($task)) ?></div>
     <div class="muted">Task GID: <?= h($taskGid) ?><?= !empty($task['completed']) ? ' | completed' : '' ?></div>
 
     <div class="card">
@@ -781,6 +826,8 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
         var isDown = false;
         var startX = 0;
         var startScrollLeft = 0;
+        var scrollLeftBtn = document.getElementById('scrollLeftBtn');
+        var scrollRightBtn = document.getElementById('scrollRightBtn');
 
         boardWrap.addEventListener('mousedown', function (event) {
           if (event.button !== 0) {
@@ -810,120 +857,160 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
           var moved = (event.pageX - startX) * 1.2;
           boardWrap.scrollLeft = startScrollLeft - moved;
         });
+
+        if (scrollLeftBtn) {
+          scrollLeftBtn.addEventListener('click', function () {
+            boardWrap.scrollBy({ left: -360, behavior: 'smooth' });
+          });
+        }
+        if (scrollRightBtn) {
+          scrollRightBtn.addEventListener('click', function () {
+            boardWrap.scrollBy({ left: 360, behavior: 'smooth' });
+          });
+        }
+      }
+
+      var searchInput = document.getElementById('taskSearch');
+      if (searchInput) {
+        var boardCols = Array.prototype.slice.call(document.querySelectorAll('.board-col'));
+        var taskCards = Array.prototype.slice.call(document.querySelectorAll('.task-item[data-search]'));
+
+        var applyTaskFilter = function () {
+          var keyword = (searchInput.value || '').trim().toLowerCase();
+          taskCards.forEach(function (card) {
+            var text = (card.getAttribute('data-search') || '').toLowerCase();
+            var matched = keyword === '' || text.indexOf(keyword) !== -1;
+            card.style.display = matched ? '' : 'none';
+          });
+
+          boardCols.forEach(function (col) {
+            var visibleCount = 0;
+            var colCards = col.querySelectorAll('.task-item[data-search]');
+            Array.prototype.forEach.call(colCards, function (card) {
+              if (card.style.display !== 'none') {
+                visibleCount += 1;
+              }
+            });
+            var countEl = col.querySelector('.board-count');
+            if (countEl) {
+              countEl.textContent = String(visibleCount);
+            }
+          });
+        };
+
+        searchInput.addEventListener('input', applyTaskFilter);
       }
 
       var items = Array.prototype.slice.call(document.querySelectorAll('[data-lightbox-item="1"]'));
       var lightbox = document.getElementById('attachmentLightbox');
-      if (!lightbox || items.length === 0) {
-        return;
-      }
+      if (lightbox && items.length > 0) {
+        var lightboxBody = document.getElementById('lightboxBody');
+        var titleEl = document.getElementById('lightboxTitle');
+        var downloadEl = document.getElementById('lightboxDownload');
+        var closeEl = document.getElementById('lightboxClose');
+        var prevEl = document.getElementById('lightboxPrev');
+        var nextEl = document.getElementById('lightboxNext');
+        var current = 0;
 
-      var lightboxBody = document.getElementById('lightboxBody');
-      var titleEl = document.getElementById('lightboxTitle');
-      var downloadEl = document.getElementById('lightboxDownload');
-      var closeEl = document.getElementById('lightboxClose');
-      var prevEl = document.getElementById('lightboxPrev');
-      var nextEl = document.getElementById('lightboxNext');
-      var current = 0;
+        function renderLightbox(index) {
+          if (index < 0) {
+            index = items.length - 1;
+          }
+          if (index >= items.length) {
+            index = 0;
+          }
+          current = index;
 
-      function renderLightbox(index) {
-        if (index < 0) {
-          index = items.length - 1;
+          var item = items[current];
+          var name = item.getAttribute('data-name') || 'Attachment';
+          var isImage = item.getAttribute('data-image') === '1';
+          var previewUrl = item.getAttribute('data-preview-url') || '';
+          var downloadUrl = item.getAttribute('data-download-url') || '';
+
+          titleEl.textContent = (current + 1) + ' / ' + items.length + ' - ' + name;
+          downloadEl.setAttribute('href', downloadUrl || '#');
+          downloadEl.style.visibility = downloadUrl ? 'visible' : 'hidden';
+
+          var oldMedia = document.getElementById('lightboxMediaSlot');
+          if (oldMedia) {
+            oldMedia.remove();
+          }
+
+          var mediaSlot = document.createElement('div');
+          mediaSlot.id = 'lightboxMediaSlot';
+          if (isImage && previewUrl) {
+            var img = document.createElement('img');
+            img.src = previewUrl;
+            img.alt = name;
+            img.className = 'lightbox-media';
+            mediaSlot.appendChild(img);
+          } else {
+            var fileBox = document.createElement('div');
+            fileBox.className = 'lightbox-file';
+            var icon = document.createElement('span');
+            icon.textContent = '\uD83D\uDCC4';
+            var txt = document.createElement('div');
+            txt.textContent = 'Preview not available';
+            fileBox.appendChild(icon);
+            fileBox.appendChild(txt);
+            mediaSlot.appendChild(fileBox);
+          }
+          lightboxBody.appendChild(mediaSlot);
         }
-        if (index >= items.length) {
-          index = 0;
-        }
-        current = index;
 
-        var item = items[current];
-        var name = item.getAttribute('data-name') || 'Attachment';
-        var isImage = item.getAttribute('data-image') === '1';
-        var previewUrl = item.getAttribute('data-preview-url') || '';
-        var downloadUrl = item.getAttribute('data-download-url') || '';
-
-        titleEl.textContent = (current + 1) + ' / ' + items.length + ' - ' + name;
-        downloadEl.setAttribute('href', downloadUrl || '#');
-        downloadEl.style.visibility = downloadUrl ? 'visible' : 'hidden';
-
-        var oldMedia = document.getElementById('lightboxMediaSlot');
-        if (oldMedia) {
-          oldMedia.remove();
+        function openLightbox(index) {
+          renderLightbox(index);
+          lightbox.classList.add('open');
+          lightbox.setAttribute('aria-hidden', 'false');
         }
 
-        var mediaSlot = document.createElement('div');
-        mediaSlot.id = 'lightboxMediaSlot';
-        if (isImage && previewUrl) {
-          var img = document.createElement('img');
-          img.src = previewUrl;
-          img.alt = name;
-          img.className = 'lightbox-media';
-          mediaSlot.appendChild(img);
-        } else {
-          var fileBox = document.createElement('div');
-          fileBox.className = 'lightbox-file';
-          var icon = document.createElement('span');
-          icon.textContent = '\uD83D\uDCC4';
-          var txt = document.createElement('div');
-          txt.textContent = 'Preview not available';
-          fileBox.appendChild(icon);
-          fileBox.appendChild(txt);
-          mediaSlot.appendChild(fileBox);
+        function closeLightbox() {
+          lightbox.classList.remove('open');
+          lightbox.setAttribute('aria-hidden', 'true');
         }
-        lightboxBody.appendChild(mediaSlot);
-      }
 
-      function openLightbox(index) {
-        renderLightbox(index);
-        lightbox.classList.add('open');
-        lightbox.setAttribute('aria-hidden', 'false');
-      }
+        items.forEach(function (item, index) {
+          item.addEventListener('click', function () {
+            if (item.disabled) {
+              return;
+            }
+            openLightbox(index);
+          });
+        });
 
-      function closeLightbox() {
-        lightbox.classList.remove('open');
-        lightbox.setAttribute('aria-hidden', 'true');
-      }
+        prevEl.addEventListener('click', function (event) {
+          event.stopPropagation();
+          renderLightbox(current - 1);
+        });
+        nextEl.addEventListener('click', function (event) {
+          event.stopPropagation();
+          renderLightbox(current + 1);
+        });
+        closeEl.addEventListener('click', closeLightbox);
 
-      items.forEach(function (item, index) {
-        item.addEventListener('click', function () {
-          if (item.disabled) {
+        lightbox.addEventListener('click', function (event) {
+          if (event.target === lightbox) {
+            closeLightbox();
+          }
+        });
+
+        document.addEventListener('keydown', function (event) {
+          if (!lightbox.classList.contains('open')) {
             return;
           }
-          openLightbox(index);
+          if (event.key === 'Escape') {
+            closeLightbox();
+            return;
+          }
+          if (event.key === 'ArrowLeft') {
+            renderLightbox(current - 1);
+            return;
+          }
+          if (event.key === 'ArrowRight') {
+            renderLightbox(current + 1);
+          }
         });
-      });
-
-      prevEl.addEventListener('click', function (event) {
-        event.stopPropagation();
-        renderLightbox(current - 1);
-      });
-      nextEl.addEventListener('click', function (event) {
-        event.stopPropagation();
-        renderLightbox(current + 1);
-      });
-      closeEl.addEventListener('click', closeLightbox);
-
-      lightbox.addEventListener('click', function (event) {
-        if (event.target === lightbox) {
-          closeLightbox();
-        }
-      });
-
-      document.addEventListener('keydown', function (event) {
-        if (!lightbox.classList.contains('open')) {
-          return;
-        }
-        if (event.key === 'Escape') {
-          closeLightbox();
-          return;
-        }
-        if (event.key === 'ArrowLeft') {
-          renderLightbox(current - 1);
-          return;
-        }
-        if (event.key === 'ArrowRight') {
-          renderLightbox(current + 1);
-        }
-      });
+      }
     })();
   </script>
 </body>
