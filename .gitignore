@@ -1,0 +1,7 @@
+data/
+files/
+tmp/
+*.zip
+*.log
+.env
+__pycache__/
