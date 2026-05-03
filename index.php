@@ -475,6 +475,64 @@ function list_zip_backup_data(string $zipPath): array {
     ];
 }
 
+function list_zip_status_counts(string $zipPath): array {
+    $zip = open_zip($zipPath);
+    $counts = [];
+
+    $sections = zip_json($zip, 'sections.json');
+    foreach ($sections as $section) {
+        if (!is_array($section)) {
+            continue;
+        }
+        $name = trim((string)($section['name'] ?? ''));
+        if ($name === '') {
+            continue;
+        }
+        if (!isset($counts[$name])) {
+            $counts[$name] = 0;
+        }
+    }
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = (string)$zip->getNameIndex($i);
+        if (!preg_match('#^tasks/([0-9]+)\.json$#', $name)) {
+            continue;
+        }
+
+        $task = zip_json($zip, $name);
+        $memberships = is_array($task['memberships'] ?? null) ? $task['memberships'] : [];
+        $taskStatuses = [];
+        foreach ($memberships as $membership) {
+            if (!is_array($membership)) {
+                continue;
+            }
+            $statusName = trim((string)($membership['section']['name'] ?? ''));
+            if ($statusName === '') {
+                continue;
+            }
+            $taskStatuses[$statusName] = true;
+        }
+
+        if (empty($taskStatuses)) {
+            if (!isset($counts['Unsectioned'])) {
+                $counts['Unsectioned'] = 0;
+            }
+            $counts['Unsectioned'] += 1;
+            continue;
+        }
+
+        foreach (array_keys($taskStatuses) as $statusName) {
+            if (!isset($counts[$statusName])) {
+                $counts[$statusName] = 0;
+            }
+            $counts[$statusName] += 1;
+        }
+    }
+
+    $zip->close();
+    return $counts;
+}
+
 function stream_zip_entry(string $zipPath, string $entryPath, bool $download = true): void {
     $zip = open_zip($zipPath);
     $stat = $zip->statName($entryPath);
@@ -654,6 +712,74 @@ if (preg_match('#^download/([a-z0-9-]+)/(.+)$#', $route, $m)) {
     exit;
 }
 
+if (preg_match('#^report/([a-z0-9-]+)/([^/]+)$#', $route, $m)) {
+    $projectSlug = $m[1];
+    $zipFile = basename($m[2]);
+    if (!preg_match('/\.zip$/i', $zipFile)) {
+        send_not_found();
+    }
+
+    $project = find_project($projects, $projectSlug);
+    if ($project === null || find_backup($project, $zipFile) === null) {
+        send_not_found();
+    }
+
+    $zipPath = $webRoot . '/files/' . $projectSlug . '/' . $zipFile;
+    if (!is_file($zipPath)) {
+        send_not_found();
+    }
+
+    $statusCounts = list_zip_status_counts($zipPath);
+    $preferredStatuses = [
+        'Client to verify',
+        'Open',
+        'Closed',
+        'Fix In Progress',
+        'Out of Scope',
+        'QA to verify',
+    ];
+
+    $rows = [];
+    $usedStatuses = [];
+    foreach ($preferredStatuses as $statusName) {
+        $count = (int)($statusCounts[$statusName] ?? 0);
+        if ($count <= 0) {
+            $usedStatuses[$statusName] = true;
+            continue;
+        }
+        $rows[] = [
+            'status' => $statusName,
+            'count' => $count,
+        ];
+        $usedStatuses[$statusName] = true;
+    }
+
+    $extraStatuses = [];
+    foreach ($statusCounts as $statusName => $count) {
+        if (isset($usedStatuses[$statusName])) {
+            continue;
+        }
+        if ((int)$count <= 0) {
+            continue;
+        }
+        $extraStatuses[] = [
+            'status' => (string)$statusName,
+            'count' => (int)$count,
+        ];
+    }
+    usort($extraStatuses, static function (array $a, array $b): int {
+        return strnatcasecmp((string)($a['status'] ?? ''), (string)($b['status'] ?? ''));
+    });
+
+    foreach ($extraStatuses as $statusRow) {
+        $rows[] = $statusRow;
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['rows' => $rows], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inline)/([0-9]+)/([0-9]+)$#', $route, $m)) {
     $projectSlug = $m[1];
     $zipFile = basename($m[2]);
@@ -743,6 +869,14 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
     .board-top { position: sticky; top: 0; z-index: 20; background: #f7f4ee; padding: 0.2rem 0 0.35rem; }
     .task-title { margin: 0 0 0.2rem; }
     .task-subtitle { margin: 0 0 0.85rem; }
+    .report-modal { position: fixed; inset: 0; background: rgba(15, 12, 7, 0.64); display: none; align-items: center; justify-content: center; z-index: 10000; padding: 1rem; box-sizing: border-box; }
+    .report-modal.open { display: flex; }
+    .report-panel { width: min(560px, 100%); max-height: 90vh; overflow: auto; background: #fffdf8; border: 1px solid #decfb7; border-radius: 10px; padding: 0.9rem; box-sizing: border-box; }
+    .report-head { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; margin-bottom: 0.7rem; }
+    .report-title { margin: 0; }
+    .report-meta { margin: 0.35rem 0 0.8rem; }
+    .report-close-btn { cursor: pointer; }
+    .report-table th:nth-child(2), .report-table td:nth-child(2) { text-align: center; }
   </style>
 </head>
 <body>
@@ -805,6 +939,7 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
             <th>File</th>
             <th>Download</th>
             <th>View</th>
+            <th>Report</th>
             <th>Size</th>
             <th>Task Count</th>
           </tr>
@@ -816,12 +951,42 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
             <td><a href="/view/<?= h($projectSlug) ?>/<?= h((string)$row['zip_file']) ?>"><?= h((string)$row['zip_file']) ?></a></td>
             <td><a class="btn" href="/download/<?= h($projectSlug) ?>/<?= h((string)$row['zip_file']) ?>">Download</a></td>
             <td><a class="btn" href="/view/<?= h($projectSlug) ?>/<?= h((string)$row['zip_file']) ?>">Open</a></td>
+            <td><button type="button" class="btn report-btn" data-report-url="/report/<?= h($projectSlug) ?>/<?= h((string)$row['zip_file']) ?>" data-report-label="<?= h((string)$row['zip_file']) ?>">View</button></td>
             <td><?= h(format_bytes((int)($row['zip_size'] ?? 0))) ?></td>
             <td><?= h((string)($row['counts']['tasks'] ?? '0')) ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
       </table>
+    </div>
+
+    <div id="reportModal" class="report-modal" aria-hidden="true">
+      <div class="report-panel" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+        <div class="report-head">
+          <h3 id="reportTitle" class="report-title">Ticket Report</h3>
+          <button type="button" id="reportClose" class="btn report-close-btn">Close</button>
+        </div>
+        <div id="reportMeta" class="muted report-meta"></div>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Case Status</th>
+              <th>Task Count</th>
+            </tr>
+          </thead>
+          <tbody id="reportRows">
+            <tr>
+              <td class="muted" colspan="2">Click a View button to load report.</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Total</th>
+              <th id="reportTotal">0</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   <?php elseif (preg_match('#^view/([a-z0-9-]+)/([^/]+)$#', $route, $m)): ?>
     <?php
@@ -1112,6 +1277,97 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
         };
 
         searchInput.addEventListener('input', applyTaskFilter);
+      }
+
+      var reportModal = document.getElementById('reportModal');
+      if (reportModal) {
+        var reportButtons = Array.prototype.slice.call(document.querySelectorAll('.report-btn[data-report-url]'));
+        var reportRows = document.getElementById('reportRows');
+        var reportMeta = document.getElementById('reportMeta');
+        var reportTotal = document.getElementById('reportTotal');
+        var reportClose = document.getElementById('reportClose');
+
+        function closeReportModal() {
+          reportModal.classList.remove('open');
+          reportModal.setAttribute('aria-hidden', 'true');
+        }
+
+        function setReportRows(contentRows) {
+          reportRows.innerHTML = '';
+          var total = 0;
+          contentRows.forEach(function (row) {
+            var tr = document.createElement('tr');
+            var statusTd = document.createElement('td');
+            var countTd = document.createElement('td');
+            statusTd.textContent = row.status;
+            countTd.textContent = String(row.count);
+            total += Number(row.count) || 0;
+            tr.appendChild(statusTd);
+            tr.appendChild(countTd);
+            reportRows.appendChild(tr);
+          });
+          if (reportTotal) {
+            reportTotal.textContent = String(total);
+          }
+        }
+
+        function showReportMessage(message) {
+          reportRows.innerHTML = '';
+          var tr = document.createElement('tr');
+          var td = document.createElement('td');
+          td.colSpan = 2;
+          td.className = 'muted';
+          td.textContent = message;
+          tr.appendChild(td);
+          reportRows.appendChild(tr);
+          if (reportTotal) {
+            reportTotal.textContent = '0';
+          }
+        }
+
+        function openReportModal(button) {
+          var reportUrl = button.getAttribute('data-report-url') || '';
+          var reportLabel = button.getAttribute('data-report-label') || '';
+
+          reportMeta.textContent = reportLabel ? 'Backup: ' + reportLabel : '';
+          showReportMessage('Loading report...');
+          reportModal.classList.add('open');
+          reportModal.setAttribute('aria-hidden', 'false');
+
+          if (!reportUrl) {
+            showReportMessage('Report URL is missing.');
+            return;
+          }
+
+          fetch(reportUrl, { headers: { 'Accept': 'application/json' } })
+            .then(function (response) {
+              if (!response.ok) {
+                throw new Error('Request failed');
+              }
+              return response.json();
+            })
+            .then(function (payload) {
+              var rows = Array.isArray(payload.rows) ? payload.rows : [];
+              if (rows.length === 0) {
+                showReportMessage('No status data found.');
+                return;
+              }
+              setReportRows(rows);
+            })
+            .catch(function () {
+              showReportMessage('Unable to load report right now.');
+            });
+        }
+
+        reportButtons.forEach(function (button) {
+          button.addEventListener('click', function () {
+            openReportModal(button);
+          });
+        });
+
+        if (reportClose) {
+          reportClose.addEventListener('click', closeReportModal);
+        }
       }
 
       var items = Array.prototype.slice.call(document.querySelectorAll('[data-lightbox-item="1"]'));
