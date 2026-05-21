@@ -7,7 +7,10 @@ $webRoot = __DIR__;
 $dataFile = $webRoot . '/data/backups.json';
 $lastRunFile = $webRoot . '/data/last-run.json';
 $envFile = $webRoot . '/.env';
+$backupEnvFile = '/opt/asana-backup/.env';
 $authAttemptsFile = $webRoot . '/data/auth-attempts.json';
+$reportingExportsDir = $webRoot . '/files/reporting';
+$reportingDownloadsFile = $webRoot . '/data/reporting-downloads.json';
 $route = trim((string)($_GET['route'] ?? ''), '/');
 
 function load_env_vars(string $path): array {
@@ -141,6 +144,56 @@ function json_read(string $path): array {
     }
     $decoded = json_decode((string)file_get_contents($path), true);
     return is_array($decoded) ? $decoded : [];
+}
+
+function json_write(string $path, array $data): void {
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    @file_put_contents($path, json_encode($data, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT), LOCK_EX);
+}
+
+function reporting_downloads_read(string $path): array {
+    $decoded = json_read($path);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $rows = [];
+    foreach ($decoded as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $fileName = basename((string)($row['file_name'] ?? ''));
+        if ($fileName === '' || !preg_match('/\.xlsx$/i', $fileName)) {
+            continue;
+        }
+        $rows[] = [
+            'file_name' => $fileName,
+            'created_at' => trim((string)($row['created_at'] ?? '')),
+            'project_gid' => trim((string)($row['project_gid'] ?? '')),
+            'project_name' => trim((string)($row['project_name'] ?? '')),
+            'row_count' => max(0, (int)($row['row_count'] ?? 0)),
+            'created_by' => trim((string)($row['created_by'] ?? '')),
+        ];
+    }
+
+    usort($rows, static function (array $a, array $b): int {
+        $aTs = strtotime((string)($a['created_at'] ?? '')) ?: 0;
+        $bTs = strtotime((string)($b['created_at'] ?? '')) ?: 0;
+        return $bTs <=> $aTs;
+    });
+    return $rows;
+}
+
+function reporting_downloads_append(string $path, array $entry): void {
+    $rows = reporting_downloads_read($path);
+    array_unshift($rows, $entry);
+    if (count($rows) > 300) {
+        $rows = array_slice($rows, 0, 300);
+    }
+    json_write($path, $rows);
 }
 
 function format_bytes(int $bytes): string {
@@ -292,6 +345,417 @@ function send_bad_request(string $message): void {
     http_response_code(400);
     echo $message;
     exit;
+}
+
+function xml_escape_text(string $value): string {
+    $value = preg_replace('/[^\x09\x0A\x0D\x20-\x7E\x{A0}-\x{D7FF}\x{E000}-\x{FFFD}]/u', ' ', $value);
+    return htmlspecialchars((string)$value, ENT_QUOTES | ENT_XML1 | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function http_status_code_from_headers(array $headers): int {
+    $statusLine = (string)($headers[0] ?? '');
+    if (preg_match('/\s([0-9]{3})\s/', $statusLine, $m)) {
+        return (int)$m[1];
+    }
+    return 0;
+}
+
+function http_header_value(array $headers, string $name): string {
+    $prefix = strtolower($name) . ':';
+    foreach ($headers as $header) {
+        if (!is_string($header)) {
+            continue;
+        }
+        $line = trim($header);
+        if ($line === '' || strpos($line, ':') === false) {
+            continue;
+        }
+        if (strtolower(substr($line, 0, strlen($prefix))) === $prefix) {
+            return trim(substr($line, strlen($prefix)));
+        }
+    }
+    return '';
+}
+
+function asana_request_json(string $token, string $endpoint, array $params = []): array {
+    $url = 'https://app.asana.com/api/1.0' . $endpoint;
+    if (!empty($params)) {
+        $query = http_build_query($params);
+        $url .= '?' . $query;
+    }
+
+    $maxAttempts = 5;
+    for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'ignore_errors' => true,
+                'timeout' => 120,
+                'header' => "Authorization: Bearer {$token}\r\nAccept: application/json\r\n",
+            ],
+        ]);
+
+        $responseBody = @file_get_contents($url, false, $context);
+        $headers = is_array($http_response_header ?? null) ? $http_response_header : [];
+        $statusCode = http_status_code_from_headers($headers);
+
+        if ($responseBody !== false && $statusCode >= 200 && $statusCode < 300) {
+            $decoded = json_decode($responseBody, true);
+            if (!is_array($decoded)) {
+                throw new RuntimeException('Asana API returned malformed JSON.');
+            }
+            return $decoded;
+        }
+
+        if ($statusCode === 429) {
+            $retryAfter = (int)http_header_value($headers, 'Retry-After');
+            sleep($retryAfter > 0 ? $retryAfter : 5);
+            continue;
+        }
+
+        if ($statusCode >= 500 && $statusCode < 600 && $attempt < ($maxAttempts - 1)) {
+            sleep(1 << $attempt);
+            continue;
+        }
+
+        $snippet = trim((string)$responseBody);
+        if ($snippet !== '') {
+            $snippet = substr($snippet, 0, 350);
+        }
+        throw new RuntimeException('Asana API request failed with status ' . $statusCode . ($snippet !== '' ? ': ' . $snippet : '.'));
+    }
+
+    throw new RuntimeException('Asana API request failed after retries.');
+}
+
+function asana_paginate(string $token, string $endpoint, array $params = []): array {
+    $items = [];
+    $offset = '';
+    while (true) {
+        $requestParams = $params;
+        if ($offset !== '') {
+            $requestParams['offset'] = $offset;
+        }
+        if (!isset($requestParams['limit'])) {
+            $requestParams['limit'] = 100;
+        }
+
+        $payload = asana_request_json($token, $endpoint, $requestParams);
+        $pageData = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+        foreach ($pageData as $item) {
+            if (is_array($item)) {
+                $items[] = $item;
+            }
+        }
+
+        $nextPage = is_array($payload['next_page'] ?? null) ? $payload['next_page'] : [];
+        $nextOffset = trim((string)($nextPage['offset'] ?? ''));
+        if ($nextOffset === '') {
+            break;
+        }
+        $offset = $nextOffset;
+    }
+
+    return $items;
+}
+
+function reporting_value_from_custom_field(array $task, array $names): string {
+    $fields = is_array($task['custom_fields'] ?? null) ? $task['custom_fields'] : [];
+    $nameMap = [];
+    foreach ($names as $name) {
+        $nameMap[strtolower(trim($name))] = true;
+    }
+    foreach ($fields as $field) {
+        if (!is_array($field)) {
+            continue;
+        }
+        $fieldName = strtolower(trim((string)($field['name'] ?? '')));
+        if ($fieldName === '' || !isset($nameMap[$fieldName])) {
+            continue;
+        }
+        $value = trim((string)($field['display_value'] ?? ''));
+        if ($value !== '') {
+            return $value;
+        }
+    }
+    return '';
+}
+
+function reporting_status_label(array $task): string {
+    $memberships = is_array($task['memberships'] ?? null) ? $task['memberships'] : [];
+    foreach ($memberships as $membership) {
+        if (!is_array($membership)) {
+            continue;
+        }
+        $name = trim((string)($membership['section']['name'] ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+    }
+    return 'Unsectioned';
+}
+
+function reporting_format_ticket_date(string $isoDate): string {
+    if ($isoDate === '') {
+        return '';
+    }
+    try {
+        $dt = new DateTimeImmutable($isoDate);
+        return $dt->format('M j, Y');
+    } catch (Exception $e) {
+        return $isoDate;
+    }
+}
+
+function reporting_comment_to_text(array $comment): string {
+    $html = (string)($comment['html_text'] ?? '');
+    if ($html !== '') {
+        $decoded = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $decoded = preg_replace('/\s+/u', ' ', (string)$decoded);
+        return trim((string)$decoded);
+    }
+    $text = trim((string)($comment['text'] ?? ''));
+    $text = preg_replace('/\s+/u', ' ', (string)$text);
+    return trim((string)$text);
+}
+
+function reporting_strip_file_names(string $text): string {
+    if ($text === '') {
+        return '';
+    }
+    $text = preg_replace('/https?:\/\/\S+/i', ' ', $text);
+    $text = preg_replace('/\b[^\s]+\.(?:pdf|png|jpg|jpeg|gif|webp|bmp|svg|doc|docx|xls|xlsx|csv|zip|rar|7z|ppt|pptx|txt)\b/i', ' ', (string)$text);
+    $text = preg_replace('/\s+/u', ' ', (string)$text);
+    return trim((string)$text);
+}
+
+function reporting_latest_comment_by_domain(array $comments, string $domain): string {
+    $latestComment = '';
+    $latestTs = 0;
+    $domainNeedle = '@' . strtolower($domain);
+    foreach ($comments as $comment) {
+        if (!is_array($comment)) {
+            continue;
+        }
+        $subtype = (string)($comment['resource_subtype'] ?? '');
+        $type = (string)($comment['type'] ?? '');
+        if ($subtype !== 'comment_added' && $type !== 'comment') {
+            continue;
+        }
+
+        $creator = is_array($comment['created_by'] ?? null) ? $comment['created_by'] : [];
+        $email = strtolower(trim((string)($creator['email'] ?? '')));
+        $name = strtolower(trim((string)($creator['name'] ?? '')));
+        $creatorText = $email !== '' ? $email : $name;
+        if ($creatorText === '' || strpos($creatorText, $domainNeedle) === false) {
+            continue;
+        }
+
+        $createdAt = trim((string)($comment['created_at'] ?? ''));
+        $createdTs = strtotime($createdAt);
+        if ($createdTs === false) {
+            $createdTs = 0;
+        }
+
+        if ($createdTs < $latestTs) {
+            continue;
+        }
+
+        $text = reporting_strip_file_names(reporting_comment_to_text($comment));
+        if ($text === '') {
+            continue;
+        }
+        $latestTs = $createdTs;
+        $latestComment = $text;
+    }
+
+    return $latestComment;
+}
+
+function reporting_column_name(int $index): string {
+    $letters = '';
+    $n = $index;
+    while ($n > 0) {
+        $mod = ($n - 1) % 26;
+        $letters = chr(65 + $mod) . $letters;
+        $n = (int)(($n - $mod - 1) / 26);
+    }
+    return $letters;
+}
+
+function reporting_create_xlsx(array $headers, array $rows, string $tmpDir): string {
+    if (!is_dir($tmpDir)) {
+        @mkdir($tmpDir, 0775, true);
+    }
+
+    $tmpBase = tempnam($tmpDir, 'reporting-');
+    if ($tmpBase === false) {
+        throw new RuntimeException('Unable to create temp file for XLSX export.');
+    }
+    $xlsxPath = $tmpBase . '.xlsx';
+    @unlink($xlsxPath);
+
+    $sheetRowsXml = [];
+    $allRows = array_merge([$headers], $rows);
+    foreach ($allRows as $rowIndex => $rowValues) {
+        $excelRow = $rowIndex + 1;
+        $cells = [];
+        foreach ($rowValues as $cellIndex => $rawValue) {
+            $column = reporting_column_name($cellIndex + 1);
+            $cellRef = $column . $excelRow;
+            $value = xml_escape_text((string)$rawValue);
+            $style = $rowIndex === 0 ? ' s="1"' : '';
+            $cells[] = '<c r="' . $cellRef . '" t="inlineStr"' . $style . '><is><t>' . $value . '</t></is></c>';
+        }
+        $sheetRowsXml[] = '<row r="' . $excelRow . '">' . implode('', $cells) . '</row>';
+    }
+
+    $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<sheetViews><sheetView workbookViewId="0"/></sheetViews>'
+        . '<sheetFormatPr defaultRowHeight="15"/>'
+        . '<cols>'
+        . '<col min="1" max="1" width="8" customWidth="1"/>'
+        . '<col min="2" max="2" width="22" customWidth="1"/>'
+        . '<col min="3" max="3" width="42" customWidth="1"/>'
+        . '<col min="4" max="4" width="16" customWidth="1"/>'
+        . '<col min="5" max="5" width="20" customWidth="1"/>'
+        . '<col min="6" max="6" width="14" customWidth="1"/>'
+        . '<col min="7" max="7" width="20" customWidth="1"/>'
+        . '<col min="8" max="8" width="42" customWidth="1"/>'
+        . '<col min="9" max="9" width="42" customWidth="1"/>'
+        . '<col min="10" max="10" width="18" customWidth="1"/>'
+        . '<col min="11" max="11" width="18" customWidth="1"/>'
+        . '</cols>'
+        . '<sheetData>' . implode('', $sheetRowsXml) . '</sheetData>'
+        . '</worksheet>';
+
+    $nowUtc = gmdate('Y-m-d\TH:i:s\Z');
+    $coreXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+        . 'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" '
+        . 'xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+        . '<dc:creator>Asana Backups</dc:creator><cp:lastModifiedBy>Asana Backups</cp:lastModifiedBy>'
+        . '<dcterms:created xsi:type="dcterms:W3CDTF">' . $nowUtc . '</dcterms:created>'
+        . '<dcterms:modified xsi:type="dcterms:W3CDTF">' . $nowUtc . '</dcterms:modified>'
+        . '</cp:coreProperties>';
+
+    $zip = new ZipArchive();
+    if ($zip->open($xlsxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        throw new RuntimeException('Unable to open XLSX archive for writing.');
+    }
+
+    $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        . '<Default Extension="xml" ContentType="application/xml"/>'
+        . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        . '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+        . '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
+        . '</Types>');
+
+    $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+        . '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>'
+        . '</Relationships>');
+
+    $zip->addFromString('docProps/app.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
+        . 'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
+        . '<Application>Asana Backups</Application>'
+        . '</Properties>');
+    $zip->addFromString('docProps/core.xml', $coreXml);
+
+    $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        . '<sheets><sheet name="Reporting" sheetId="1" r:id="rId1"/></sheets>'
+        . '</workbook>');
+
+    $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        . '</Relationships>');
+
+    $zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+        . '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>'
+        . '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+        . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        . '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+        . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+        . '</styleSheet>');
+
+    $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+    $zip->close();
+    @unlink($tmpBase);
+
+    return $xlsxPath;
+}
+
+function reporting_build_rows(string $token, string $projectGid): array {
+    $tasks = asana_paginate(
+        $token,
+        '/projects/' . rawurlencode($projectGid) . '/tasks',
+        [
+            'completed_since' => '1970-01-01T00:00:00Z',
+            'opt_fields' => 'gid,name,created_at,memberships.section.name,custom_fields.name,custom_fields.display_value',
+        ]
+    );
+
+    usort($tasks, static function (array $a, array $b): int {
+        $createdA = strtotime((string)($a['created_at'] ?? '')) ?: 0;
+        $createdB = strtotime((string)($b['created_at'] ?? '')) ?: 0;
+        if ($createdA !== $createdB) {
+            return $createdA <=> $createdB;
+        }
+        return strnatcasecmp((string)($a['name'] ?? ''), (string)($b['name'] ?? ''));
+    });
+
+    $rows = [];
+    $serial = 1;
+    foreach ($tasks as $task) {
+        $taskGid = trim((string)($task['gid'] ?? ''));
+        if ($taskGid === '') {
+            continue;
+        }
+
+        $taskName = trim((string)($task['name'] ?? ''));
+        if ($taskName === '') {
+            continue;
+        }
+
+        $stories = asana_paginate(
+            $token,
+            '/tasks/' . rawurlencode($taskGid) . '/stories',
+            [
+                'opt_fields' => 'type,resource_subtype,text,html_text,created_at,created_by.name,created_by.email',
+            ]
+        );
+
+        $rows[] = [
+            (string)$serial,
+            reporting_format_ticket_date((string)($task['created_at'] ?? '')),
+            $taskName,
+            '',
+            reporting_value_from_custom_field($task, ['Platform']),
+            reporting_value_from_custom_field($task, ['Priority', 'Prority']),
+            reporting_status_label($task),
+            reporting_latest_comment_by_domain($stories, 'codigo.co'),
+            reporting_latest_comment_by_domain($stories, 'kmspks.org'),
+            '',
+            reporting_value_from_custom_field($task, ['KMS']),
+        ];
+        $serial++;
+    }
+
+    return $rows;
 }
 
 function find_project(array $projects, string $slug): ?array {
@@ -686,7 +1150,99 @@ if (!$isAuthenticated) {
 $index = json_read($dataFile);
 $projects = $index['projects'] ?? [];
 $lastRun = json_read($lastRunFile);
+$reportingProject = is_array($projects[0] ?? null) ? $projects[0] : null;
+$reportingProjectGid = trim((string)($reportingProject['project_gid'] ?? ''));
+$reportingProjectName = trim((string)($reportingProject['project_name'] ?? ''));
+$reportingDownloads = reporting_downloads_read($reportingDownloadsFile);
 $isViewerPageRoute = preg_match('#^view/[a-z0-9-]+/[^/]+(?:/task/[0-9]+)?$#', $route) === 1;
+
+if (preg_match('#^reporting/download/(.+)$#', $route, $m)) {
+    $fileName = basename((string)$m[1]);
+    if ($fileName === '' || !preg_match('/\.xlsx$/i', $fileName)) {
+        send_not_found();
+    }
+
+    $fullPath = $reportingExportsDir . '/' . $fileName;
+    if (!is_file($fullPath)) {
+        send_not_found();
+    }
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Length: ' . (string)filesize($fullPath));
+    header('Content-Disposition: attachment; filename="' . rawurlencode($fileName) . '"');
+    readfile($fullPath);
+    exit;
+}
+
+if ($route === 'reporting/export') {
+    if ($reportingProjectGid === '') {
+        send_bad_request('Reporting project is not configured.');
+    }
+
+    if (!is_file($backupEnvFile)) {
+        send_bad_request('Asana env file not found at /opt/asana-backup/.env.');
+    }
+    if (!is_readable($backupEnvFile)) {
+        send_bad_request('Asana env file exists but is not readable by the web server user.');
+    }
+
+    $backupEnv = load_env_vars($backupEnvFile);
+    $asanaToken = trim((string)($backupEnv['ASANA_TOKEN'] ?? ''));
+    if ($asanaToken === '') {
+        send_bad_request('ASANA_TOKEN is missing in /opt/asana-backup/.env.');
+    }
+
+    @set_time_limit(0);
+
+    try {
+        $headers = [
+            'S/N',
+            'Ticket Creation date',
+            'Issue Name & Title',
+            'Module',
+            'Platform',
+            'Priority',
+            'Status',
+            'Last Comment from Codigo.co',
+            'Last Comment from KMSPKS.org',
+            'Department',
+            'KMS-ID',
+        ];
+        $rows = reporting_build_rows($asanaToken, $reportingProjectGid);
+        $xlsxPath = reporting_create_xlsx($headers, $rows, $webRoot . '/tmp');
+
+        if (!is_dir($reportingExportsDir)) {
+            @mkdir($reportingExportsDir, 0775, true);
+        }
+        $savedFileName = 'reporting-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.xlsx';
+        $savedPath = $reportingExportsDir . '/' . $savedFileName;
+        if (!@rename($xlsxPath, $savedPath)) {
+            if (!@copy($xlsxPath, $savedPath)) {
+                throw new RuntimeException('Failed to save reporting file on server.');
+            }
+            @unlink($xlsxPath);
+        }
+
+        reporting_downloads_append($reportingDownloadsFile, [
+            'file_name' => $savedFileName,
+            'created_at' => gmdate('c'),
+            'project_gid' => $reportingProjectGid,
+            'project_name' => $reportingProjectName,
+            'row_count' => count($rows),
+            'created_by' => trim((string)($_SESSION['auth_username'] ?? 'user')),
+        ]);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo 'Failed to generate reporting file.';
+        exit;
+    }
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Length: ' . (string)filesize($savedPath));
+    header('Content-Disposition: attachment; filename="' . rawurlencode($savedFileName) . '"');
+    readfile($savedPath);
+    exit;
+}
 
 if (preg_match('#^download/([a-z0-9-]+)/(.+)$#', $route, $m)) {
     $projectSlug = $m[1];
@@ -884,6 +1440,8 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
   <?php if ($authEnabled): ?>
     <div class="card">
       Signed in as <strong><?= h((string)($_SESSION['auth_username'] ?? 'user')) ?></strong>
+      <a class="btn" style="margin-left:0.55rem;" href="/">Backups</a>
+      <a class="btn" style="margin-left:0.55rem;" href="/reporting">Reporting</a>
       <a class="btn" style="margin-left:0.55rem;" href="/logout">Logout</a>
     </div>
   <?php endif; ?>
@@ -914,6 +1472,44 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
         </div>
       <?php endforeach; ?>
     <?php endif; ?>
+  <?php elseif ($route === 'reporting'): ?>
+    <div class="card">
+      <h2 style="margin-top:0;">Reporting</h2>
+      <?php if ($reportingProjectGid === ''): ?>
+        <p class="muted">No project found in the backup index yet.</p>
+      <?php else: ?>
+        <p style="margin:0 0 0.75rem;"><strong>Project:</strong> <?= h($reportingProjectName !== '' ? $reportingProjectName : $reportingProjectGid) ?><?php if ($reportingProjectName !== ''): ?> <span class="muted">(GID: <?= h($reportingProjectGid) ?>)</span><?php endif; ?></p>
+        <p class="muted" style="margin:0 0 0.9rem;">Generate a new XLSX report and keep each generated file on this server for later download.</p>
+        <a class="btn" href="/reporting/export">Download XLSX</a>
+        <h3 style="margin:1rem 0 0.55rem;">Generated Files</h3>
+        <?php if (empty($reportingDownloads)): ?>
+          <div class="muted">No generated reporting files yet.</div>
+        <?php else: ?>
+          <table>
+            <thead>
+              <tr>
+                <th>Generated At</th>
+                <th>File</th>
+                <th>Rows</th>
+                <th>Generated By</th>
+                <th>Download</th>
+              </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($reportingDownloads as $entry): ?>
+              <tr>
+                <td><?= h(format_datetime((string)($entry['created_at'] ?? ''))) ?></td>
+                <td><?= h((string)($entry['file_name'] ?? '')) ?></td>
+                <td><?= h((string)($entry['row_count'] ?? '0')) ?></td>
+                <td><?= h((string)(((string)($entry['created_by'] ?? '')) !== '' ? (string)$entry['created_by'] : 'user')) ?></td>
+                <td><a class="btn" href="/reporting/download/<?= h((string)($entry['file_name'] ?? '')) ?>">Download</a></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php endif; ?>
+      <?php endif; ?>
+    </div>
   <?php elseif (preg_match('#^project/([a-z0-9-]+)$#', $route, $m)): ?>
     <?php
       $projectSlug = $m[1];
