@@ -507,6 +507,19 @@ function reporting_format_ticket_date(string $isoDate): string {
     }
 }
 
+function reporting_days_between(string $startIso, string $endIso): string {
+    if ($startIso === '' || $endIso === '') {
+        return '';
+    }
+    $startTs = strtotime($startIso);
+    $endTs = strtotime($endIso);
+    if ($startTs === false || $endTs === false) {
+        return '';
+    }
+    $days = (int)floor(($endTs - $startTs) / 86400);
+    return (string)max(0, $days);
+}
+
 function reporting_comment_to_text(array $comment): string {
     $html = (string)($comment['html_text'] ?? '');
     if ($html !== '') {
@@ -617,15 +630,17 @@ function reporting_create_xlsx(array $headers, array $rows, string $tmpDir): str
         . '<cols>'
         . '<col min="1" max="1" width="8" customWidth="1"/>'
         . '<col min="2" max="2" width="22" customWidth="1"/>'
-        . '<col min="3" max="3" width="42" customWidth="1"/>'
-        . '<col min="4" max="4" width="16" customWidth="1"/>'
-        . '<col min="5" max="5" width="20" customWidth="1"/>'
-        . '<col min="6" max="6" width="14" customWidth="1"/>'
+        . '<col min="3" max="3" width="22" customWidth="1"/>'
+        . '<col min="4" max="4" width="10" customWidth="1"/>'
+        . '<col min="5" max="5" width="42" customWidth="1"/>'
+        . '<col min="6" max="6" width="16" customWidth="1"/>'
         . '<col min="7" max="7" width="20" customWidth="1"/>'
-        . '<col min="8" max="8" width="42" customWidth="1"/>'
-        . '<col min="9" max="9" width="42" customWidth="1"/>'
-        . '<col min="10" max="10" width="18" customWidth="1"/>'
-        . '<col min="11" max="11" width="18" customWidth="1"/>'
+        . '<col min="8" max="8" width="14" customWidth="1"/>'
+        . '<col min="9" max="9" width="20" customWidth="1"/>'
+        . '<col min="10" max="10" width="42" customWidth="1"/>'
+        . '<col min="11" max="11" width="42" customWidth="1"/>'
+        . '<col min="12" max="12" width="18" customWidth="1"/>'
+        . '<col min="13" max="13" width="18" customWidth="1"/>'
         . '</cols>'
         . '<sheetData>' . implode('', $sheetRowsXml) . '</sheetData>'
         . '</worksheet>';
@@ -705,7 +720,7 @@ function reporting_build_rows(string $token, string $projectGid): array {
         '/projects/' . rawurlencode($projectGid) . '/tasks',
         [
             'completed_since' => '1970-01-01T00:00:00Z',
-            'opt_fields' => 'gid,name,created_at,memberships.section.name,custom_fields.name,custom_fields.display_value',
+            'opt_fields' => 'gid,name,created_at,modified_at,memberships.section.name,custom_fields.name,custom_fields.display_value',
         ]
     );
 
@@ -742,6 +757,8 @@ function reporting_build_rows(string $token, string $projectGid): array {
         $rows[] = [
             (string)$serial,
             reporting_format_ticket_date((string)($task['created_at'] ?? '')),
+            reporting_format_ticket_date((string)($task['modified_at'] ?? '')),
+            reporting_days_between((string)($task['created_at'] ?? ''), (string)($task['modified_at'] ?? '')),
             $taskName,
             '',
             reporting_value_from_custom_field($task, ['Platform']),
@@ -1198,6 +1215,8 @@ if ($route === 'reporting/export') {
         $headers = [
             'S/N',
             'Ticket Creation date',
+            'Last Modified Date',
+            'Days',
             'Issue Name & Title',
             'Module',
             'Platform',
