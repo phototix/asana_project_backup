@@ -11,6 +11,8 @@ $backupEnvFile = '/opt/asana-backup/.env';
 $authAttemptsFile = $webRoot . '/data/auth-attempts.json';
 $reportingExportsDir = $webRoot . '/files/reporting';
 $reportingDownloadsFile = $webRoot . '/data/reporting-downloads.json';
+$reportingExportJobsFile = $webRoot . '/data/reporting-export-jobs.json';
+$reportingExportLockFile = $webRoot . '/data/reporting-export.lock';
 $route = trim((string)($_GET['route'] ?? ''), '/');
 
 function load_env_vars(string $path): array {
@@ -194,6 +196,126 @@ function reporting_downloads_append(string $path, array $entry): void {
         $rows = array_slice($rows, 0, 300);
     }
     json_write($path, $rows);
+}
+
+function reporting_export_jobs_read(string $path): array {
+    $decoded = json_read($path);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $jobs = [];
+    foreach ($decoded as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        $id = trim((string)($row['id'] ?? ''));
+        $status = trim((string)($row['status'] ?? ''));
+        if ($id === '' || !in_array($status, ['queued', 'running', 'done', 'failed'], true)) {
+            continue;
+        }
+        $fileName = basename((string)($row['file_name'] ?? ''));
+        if ($fileName !== '' && !preg_match('/\.xlsx$/i', $fileName)) {
+            $fileName = '';
+        }
+        $jobs[] = [
+            'id' => $id,
+            'status' => $status,
+            'created_at' => trim((string)($row['created_at'] ?? '')),
+            'started_at' => trim((string)($row['started_at'] ?? '')),
+            'finished_at' => trim((string)($row['finished_at'] ?? '')),
+            'file_name' => $fileName,
+            'project_gid' => trim((string)($row['project_gid'] ?? '')),
+            'project_name' => trim((string)($row['project_name'] ?? '')),
+            'row_count' => max(0, (int)($row['row_count'] ?? 0)),
+            'created_by' => trim((string)($row['created_by'] ?? '')),
+            'error' => trim((string)($row['error'] ?? '')),
+        ];
+    }
+
+    usort($jobs, static function (array $a, array $b): int {
+        $aTs = strtotime((string)($a['created_at'] ?? '')) ?: 0;
+        $bTs = strtotime((string)($b['created_at'] ?? '')) ?: 0;
+        return $bTs <=> $aTs;
+    });
+    return $jobs;
+}
+
+function reporting_export_jobs_write(string $path, array $jobs): void {
+    if (count($jobs) > 150) {
+        $jobs = array_slice($jobs, 0, 150);
+    }
+    json_write($path, $jobs);
+}
+
+function reporting_export_find_active(array $jobs): ?array {
+    foreach ($jobs as $job) {
+        if (!is_array($job)) {
+            continue;
+        }
+        $status = (string)($job['status'] ?? '');
+        if ($status === 'queued' || $status === 'running') {
+            return $job;
+        }
+    }
+    return null;
+}
+
+function reporting_export_job_update(array &$jobs, string $jobId, array $changes): bool {
+    foreach ($jobs as $idx => $job) {
+        if (!is_array($job) || (string)($job['id'] ?? '') !== $jobId) {
+            continue;
+        }
+        $jobs[$idx] = array_merge($job, $changes);
+        return true;
+    }
+    return false;
+}
+
+function reporting_with_lock(string $lockPath, callable $callback) {
+    $dir = dirname($lockPath);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+
+    $lockHandle = @fopen($lockPath, 'c+');
+    if ($lockHandle === false) {
+        throw new RuntimeException('Unable to open reporting lock file.');
+    }
+
+    try {
+        if (!@flock($lockHandle, LOCK_EX)) {
+            throw new RuntimeException('Unable to lock reporting export state.');
+        }
+        return $callback();
+    } finally {
+        @flock($lockHandle, LOCK_UN);
+        @fclose($lockHandle);
+    }
+}
+
+function reporting_export_status_label(string $status): string {
+    if ($status === 'queued') {
+        return 'Queued';
+    }
+    if ($status === 'running') {
+        return 'Running';
+    }
+    if ($status === 'done') {
+        return 'Completed';
+    }
+    if ($status === 'failed') {
+        return 'Failed';
+    }
+    return 'Unknown';
+}
+
+function reporting_safe_error_message(Throwable $e): string {
+    $message = trim((string)$e->getMessage());
+    if ($message === '') {
+        return 'Export failed due to an unknown error.';
+    }
+    return substr($message, 0, 240);
 }
 
 function format_bytes(int $bytes): string {
@@ -585,6 +707,37 @@ function reporting_latest_comment_by_domain(array $comments, string $domain): st
     return $latestComment;
 }
 
+function reporting_latest_comment_timestamp(array $comments): string {
+    $latestIso = '';
+    $latestTs = 0;
+    foreach ($comments as $comment) {
+        if (!is_array($comment)) {
+            continue;
+        }
+        $subtype = (string)($comment['resource_subtype'] ?? '');
+        $type = (string)($comment['type'] ?? '');
+        if ($subtype !== 'comment_added' && $type !== 'comment') {
+            continue;
+        }
+
+        $createdAt = trim((string)($comment['created_at'] ?? ''));
+        if ($createdAt === '') {
+            continue;
+        }
+        $createdTs = strtotime($createdAt);
+        if ($createdTs === false) {
+            continue;
+        }
+        if ($createdTs < $latestTs) {
+            continue;
+        }
+
+        $latestTs = $createdTs;
+        $latestIso = $createdAt;
+    }
+    return $latestIso;
+}
+
 function reporting_column_name(int $index): string {
     $letters = '';
     $n = $index;
@@ -616,8 +769,18 @@ function reporting_create_xlsx(array $headers, array $rows, string $tmpDir): str
         foreach ($rowValues as $cellIndex => $rawValue) {
             $column = reporting_column_name($cellIndex + 1);
             $cellRef = $column . $excelRow;
-            $value = xml_escape_text((string)$rawValue);
             $style = $rowIndex === 0 ? ' s="1"' : '';
+            $rawText = trim((string)$rawValue);
+            $isNumericCell = $rowIndex > 0
+                && in_array($cellIndex, [0, 3], true)
+                && preg_match('/^-?[0-9]+$/', $rawText) === 1;
+
+            if ($isNumericCell) {
+                $cells[] = '<c r="' . $cellRef . '"' . $style . '><v>' . $rawText . '</v></c>';
+                continue;
+            }
+
+            $value = xml_escape_text((string)$rawValue);
             $cells[] = '<c r="' . $cellRef . '" t="inlineStr"' . $style . '><is><t>' . $value . '</t></is></c>';
         }
         $sheetRowsXml[] = '<row r="' . $excelRow . '">' . implode('', $cells) . '</row>';
@@ -720,7 +883,7 @@ function reporting_build_rows(string $token, string $projectGid): array {
         '/projects/' . rawurlencode($projectGid) . '/tasks',
         [
             'completed_since' => '1970-01-01T00:00:00Z',
-            'opt_fields' => 'gid,name,created_at,modified_at,memberships.section.name,custom_fields.name,custom_fields.display_value',
+            'opt_fields' => 'gid,name,created_at,memberships.section.name,custom_fields.name,custom_fields.display_value',
         ]
     );
 
@@ -753,26 +916,82 @@ function reporting_build_rows(string $token, string $projectGid): array {
                 'opt_fields' => 'type,resource_subtype,text,html_text,created_at,created_by.name,created_by.email',
             ]
         );
+        $latestCommentAt = reporting_latest_comment_timestamp($stories);
 
         $rows[] = [
             (string)$serial,
             reporting_format_ticket_date((string)($task['created_at'] ?? '')),
-            reporting_format_ticket_date((string)($task['modified_at'] ?? '')),
-            reporting_days_between((string)($task['created_at'] ?? ''), (string)($task['modified_at'] ?? '')),
+            reporting_format_ticket_date($latestCommentAt),
+            reporting_days_between((string)($task['created_at'] ?? ''), $latestCommentAt),
             $taskName,
+            '',
             '',
             reporting_value_from_custom_field($task, ['Platform']),
             reporting_value_from_custom_field($task, ['Priority', 'Prority']),
             reporting_status_label($task),
             reporting_latest_comment_by_domain($stories, 'codigo.co'),
             reporting_latest_comment_by_domain($stories, 'kmspks.org'),
-            '',
             reporting_value_from_custom_field($task, ['KMS']),
         ];
         $serial++;
     }
 
     return $rows;
+}
+
+function reporting_generate_export_file(
+    string $asanaToken,
+    string $reportingProjectGid,
+    string $reportingProjectName,
+    string $webRoot,
+    string $reportingExportsDir,
+    string $reportingDownloadsFile,
+    string $createdBy
+): array {
+        $headers = [
+            'S/N',
+            'Ticket Creation date',
+            'Last Modified Date',
+            'Days',
+            'Issue Name & Title',
+            'Module',
+            'Department',
+            'Platform',
+            'Priority',
+            'Status',
+            'Last Comment from Codigo.co',
+            'Last Comment from KMSPKS.org',
+            'KMS-ID',
+        ];
+    $rows = reporting_build_rows($asanaToken, $reportingProjectGid);
+    $xlsxPath = reporting_create_xlsx($headers, $rows, $webRoot . '/tmp');
+
+    if (!is_dir($reportingExportsDir)) {
+        @mkdir($reportingExportsDir, 0775, true);
+    }
+    $savedFileName = 'reporting-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.xlsx';
+    $savedPath = $reportingExportsDir . '/' . $savedFileName;
+    if (!@rename($xlsxPath, $savedPath)) {
+        if (!@copy($xlsxPath, $savedPath)) {
+            throw new RuntimeException('Failed to save reporting file on server.');
+        }
+        @unlink($xlsxPath);
+    }
+
+    reporting_downloads_append($reportingDownloadsFile, [
+        'file_name' => $savedFileName,
+        'created_at' => gmdate('c'),
+        'project_gid' => $reportingProjectGid,
+        'project_name' => $reportingProjectName,
+        'row_count' => count($rows),
+        'created_by' => $createdBy,
+    ]);
+
+    return [
+        'file_name' => $savedFileName,
+        'saved_path' => $savedPath,
+        'row_count' => count($rows),
+    ];
 }
 
 function find_project(array $projects, string $slug): ?array {
@@ -1171,6 +1390,13 @@ $reportingProject = is_array($projects[0] ?? null) ? $projects[0] : null;
 $reportingProjectGid = trim((string)($reportingProject['project_gid'] ?? ''));
 $reportingProjectName = trim((string)($reportingProject['project_name'] ?? ''));
 $reportingDownloads = reporting_downloads_read($reportingDownloadsFile);
+$reportingExportJobs = reporting_export_jobs_read($reportingExportJobsFile);
+$reportingLatestJob = is_array($reportingExportJobs[0] ?? null) ? $reportingExportJobs[0] : null;
+$reportingActiveJob = reporting_export_find_active($reportingExportJobs);
+$reportingNotice = is_array($_SESSION['reporting_notice'] ?? null) ? $_SESSION['reporting_notice'] : null;
+if (isset($_SESSION['reporting_notice'])) {
+    unset($_SESSION['reporting_notice']);
+}
 $isViewerPageRoute = preg_match('#^view/[a-z0-9-]+/[^/]+(?:/task/[0-9]+)?$#', $route) === 1;
 
 if (preg_match('#^reporting/download/(.+)$#', $route, $m)) {
@@ -1209,57 +1435,126 @@ if ($route === 'reporting/export') {
         send_bad_request('ASANA_TOKEN is missing in /opt/asana-backup/.env.');
     }
 
-    @set_time_limit(0);
+    $createdBy = trim((string)($_SESSION['auth_username'] ?? 'user'));
+    $jobId = 'reporting-export-' . gmdate('Ymd-His') . '-' . bin2hex(random_bytes(4));
 
-    try {
-        $headers = [
-            'S/N',
-            'Ticket Creation date',
-            'Last Modified Date',
-            'Days',
-            'Issue Name & Title',
-            'Module',
-            'Platform',
-            'Priority',
-            'Status',
-            'Last Comment from Codigo.co',
-            'Last Comment from KMSPKS.org',
-            'Department',
-            'KMS-ID',
-        ];
-        $rows = reporting_build_rows($asanaToken, $reportingProjectGid);
-        $xlsxPath = reporting_create_xlsx($headers, $rows, $webRoot . '/tmp');
-
-        if (!is_dir($reportingExportsDir)) {
-            @mkdir($reportingExportsDir, 0775, true);
-        }
-        $savedFileName = 'reporting-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.xlsx';
-        $savedPath = $reportingExportsDir . '/' . $savedFileName;
-        if (!@rename($xlsxPath, $savedPath)) {
-            if (!@copy($xlsxPath, $savedPath)) {
-                throw new RuntimeException('Failed to save reporting file on server.');
-            }
-            @unlink($xlsxPath);
+    $enqueueResult = reporting_with_lock($reportingExportLockFile, static function () use (
+        $reportingExportJobsFile,
+        $reportingProjectGid,
+        $reportingProjectName,
+        $createdBy,
+        $jobId
+    ): array {
+        $jobs = reporting_export_jobs_read($reportingExportJobsFile);
+        $active = reporting_export_find_active($jobs);
+        if ($active !== null) {
+            return [
+                'enqueued' => false,
+                'active' => $active,
+            ];
         }
 
-        reporting_downloads_append($reportingDownloadsFile, [
-            'file_name' => $savedFileName,
+        $job = [
+            'id' => $jobId,
+            'status' => 'queued',
             'created_at' => gmdate('c'),
+            'started_at' => '',
+            'finished_at' => '',
+            'file_name' => '',
             'project_gid' => $reportingProjectGid,
             'project_name' => $reportingProjectName,
-            'row_count' => count($rows),
-            'created_by' => trim((string)($_SESSION['auth_username'] ?? 'user')),
-        ]);
-    } catch (Throwable $e) {
-        http_response_code(500);
-        echo 'Failed to generate reporting file.';
+            'row_count' => 0,
+            'created_by' => $createdBy,
+            'error' => '',
+        ];
+        array_unshift($jobs, $job);
+        reporting_export_jobs_write($reportingExportJobsFile, $jobs);
+
+        return [
+            'enqueued' => true,
+            'job' => $job,
+        ];
+    });
+
+    if (!(bool)($enqueueResult['enqueued'] ?? false)) {
+        $_SESSION['reporting_notice'] = [
+            'type' => 'warn',
+            'text' => 'An XLSX export is already in progress. Please wait until it finishes.',
+        ];
+        header('Location: /reporting', true, 303);
         exit;
     }
 
-    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    header('Content-Length: ' . (string)filesize($savedPath));
-    header('Content-Disposition: attachment; filename="' . rawurlencode($savedFileName) . '"');
-    readfile($savedPath);
+    $_SESSION['reporting_notice'] = [
+        'type' => 'ok',
+        'text' => 'Export queued. The XLSX file will appear in Generated Files when completed.',
+    ];
+    header('Location: /reporting', true, 303);
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+    @ignore_user_abort(true);
+    @set_time_limit(0);
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    } else {
+        @ob_flush();
+        @flush();
+    }
+
+    try {
+        reporting_with_lock($reportingExportLockFile, static function () use ($reportingExportJobsFile, $jobId): void {
+            $jobs = reporting_export_jobs_read($reportingExportJobsFile);
+            $updated = reporting_export_job_update($jobs, $jobId, [
+                'status' => 'running',
+                'started_at' => gmdate('c'),
+                'finished_at' => '',
+                'error' => '',
+            ]);
+            if ($updated) {
+                reporting_export_jobs_write($reportingExportJobsFile, $jobs);
+            }
+        });
+
+        $result = reporting_generate_export_file(
+            $asanaToken,
+            $reportingProjectGid,
+            $reportingProjectName,
+            $webRoot,
+            $reportingExportsDir,
+            $reportingDownloadsFile,
+            $createdBy
+        );
+
+        reporting_with_lock($reportingExportLockFile, static function () use ($reportingExportJobsFile, $jobId, $result): void {
+            $jobs = reporting_export_jobs_read($reportingExportJobsFile);
+            $updated = reporting_export_job_update($jobs, $jobId, [
+                'status' => 'done',
+                'finished_at' => gmdate('c'),
+                'file_name' => (string)($result['file_name'] ?? ''),
+                'row_count' => max(0, (int)($result['row_count'] ?? 0)),
+                'error' => '',
+            ]);
+            if ($updated) {
+                reporting_export_jobs_write($reportingExportJobsFile, $jobs);
+            }
+        });
+    } catch (Throwable $e) {
+        $errorMessage = reporting_safe_error_message($e);
+        reporting_with_lock($reportingExportLockFile, static function () use ($reportingExportJobsFile, $jobId, $errorMessage): void {
+            $jobs = reporting_export_jobs_read($reportingExportJobsFile);
+            $updated = reporting_export_job_update($jobs, $jobId, [
+                'status' => 'failed',
+                'finished_at' => gmdate('c'),
+                'error' => $errorMessage,
+            ]);
+            if ($updated) {
+                reporting_export_jobs_write($reportingExportJobsFile, $jobs);
+            }
+        });
+    }
+
     exit;
 }
 
@@ -1406,6 +1701,10 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
     a:hover { text-decoration: underline; }
     .card { background: #fffdf8; border: 1px solid #ddd2bf; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
     .muted { color: #6d5f4e; }
+    .notice { border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0 0 0.8rem; border: 1px solid #ddd2bf; }
+    .notice.ok { background: #f0f7ee; border-color: #bdd9b8; color: #24522a; }
+    .notice.warn { background: #fff6e8; border-color: #e1c89f; color: #6a4319; }
+    .notice.err { background: #fff0ee; border-color: #e2b8b0; color: #8c261a; }
     table { width: 100%; border-collapse: collapse; }
     th, td { border-bottom: 1px solid #eee2cf; text-align: left; padding: 0.55rem; }
     .board-wrap { display: flex; gap: 0.9rem; align-items: stretch; overflow-x: auto; overflow-y: hidden; padding: 0.5rem; border: 1px solid #ddd2bf; border-radius: 8px; background: #f6f0e6; cursor: grab; scroll-behavior: smooth; }
@@ -1497,9 +1796,31 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
       <?php if ($reportingProjectGid === ''): ?>
         <p class="muted">No project found in the backup index yet.</p>
       <?php else: ?>
+        <?php if (is_array($reportingNotice)): ?>
+          <?php $noticeType = (string)($reportingNotice['type'] ?? 'ok'); ?>
+          <div class="notice <?= h(in_array($noticeType, ['ok', 'warn', 'err'], true) ? $noticeType : 'ok') ?>"><?= h((string)($reportingNotice['text'] ?? '')) ?></div>
+        <?php endif; ?>
         <p style="margin:0 0 0.75rem;"><strong>Project:</strong> <?= h($reportingProjectName !== '' ? $reportingProjectName : $reportingProjectGid) ?><?php if ($reportingProjectName !== ''): ?> <span class="muted">(GID: <?= h($reportingProjectGid) ?>)</span><?php endif; ?></p>
-        <p class="muted" style="margin:0 0 0.9rem;">Generate a new XLSX report and keep each generated file on this server for later download.</p>
-        <a class="btn" href="/reporting/export">Download XLSX</a>
+        <p class="muted" style="margin:0 0 0.9rem;">Generate a new XLSX report in the background and download it once completed.</p>
+        <?php if (is_array($reportingLatestJob)): ?>
+          <?php $latestStatus = (string)($reportingLatestJob['status'] ?? ''); ?>
+          <div class="card" style="margin:0 0 0.9rem;">
+            <strong>Latest Export:</strong> <?= h(reporting_export_status_label($latestStatus)) ?>
+            <?php if ($latestStatus === 'running' || $latestStatus === 'queued'): ?>
+              <span class="muted"> - Started by <?= h((string)($reportingLatestJob['created_by'] ?? 'user')) ?> at <?= h(format_datetime((string)($reportingLatestJob['created_at'] ?? ''))) ?></span>
+            <?php elseif ($latestStatus === 'done'): ?>
+              <span class="muted"> - Finished at <?= h(format_datetime((string)($reportingLatestJob['finished_at'] ?? ''))) ?><?php if (((string)($reportingLatestJob['file_name'] ?? '')) !== ''): ?>, file <?= h((string)$reportingLatestJob['file_name']) ?><?php endif; ?></span>
+            <?php elseif ($latestStatus === 'failed'): ?>
+              <span class="muted"> - <?= h((string)($reportingLatestJob['error'] ?? 'Export failed.')) ?></span>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+        <?php if (is_array($reportingActiveJob)): ?>
+          <div class="notice warn" style="margin-top:0;">An export is in progress. New export requests are blocked until it finishes.</div>
+          <span class="btn" style="opacity:.55;cursor:not-allowed;">Generate XLSX</span>
+        <?php else: ?>
+          <a class="btn" href="/reporting/export">Generate XLSX</a>
+        <?php endif; ?>
         <h3 style="margin:1rem 0 0.55rem;">Generated Files</h3>
         <?php if (empty($reportingDownloads)): ?>
           <div class="muted">No generated reporting files yet.</div>
