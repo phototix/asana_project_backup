@@ -1801,7 +1801,6 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
           <div class="notice <?= h(in_array($noticeType, ['ok', 'warn', 'err'], true) ? $noticeType : 'ok') ?>"><?= h((string)($reportingNotice['text'] ?? '')) ?></div>
         <?php endif; ?>
         <p style="margin:0 0 0.75rem;"><strong>Project:</strong> <?= h($reportingProjectName !== '' ? $reportingProjectName : $reportingProjectGid) ?><?php if ($reportingProjectName !== ''): ?> <span class="muted">(GID: <?= h($reportingProjectGid) ?>)</span><?php endif; ?></p>
-        <p class="muted" style="margin:0 0 0.9rem;">Generate a new XLSX report in the background and download it once completed.</p>
         <?php if (is_array($reportingLatestJob)): ?>
           <?php $latestStatus = (string)($reportingLatestJob['status'] ?? ''); ?>
           <div class="card" style="margin:0 0 0.9rem;">
@@ -1809,7 +1808,7 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
             <?php if ($latestStatus === 'running' || $latestStatus === 'queued'): ?>
               <span class="muted"> - Started by <?= h((string)($reportingLatestJob['created_by'] ?? 'user')) ?> at <?= h(format_datetime((string)($reportingLatestJob['created_at'] ?? ''))) ?></span>
             <?php elseif ($latestStatus === 'done'): ?>
-              <span class="muted"> - Finished at <?= h(format_datetime((string)($reportingLatestJob['finished_at'] ?? ''))) ?><?php if (((string)($reportingLatestJob['file_name'] ?? '')) !== ''): ?>, file <?= h((string)$reportingLatestJob['file_name']) ?><?php endif; ?></span>
+              <span class="muted"> - Finished at <?= h(format_datetime((string)($reportingLatestJob['finished_at'] ?? ''))) ?><?php if (((string)($reportingLatestJob['file_name'] ?? '')) !== ''): ?>, file <strong><?= h((string)$reportingLatestJob['file_name']) ?></strong><?php endif; ?></span>
             <?php elseif ($latestStatus === 'failed'): ?>
               <span class="muted"> - <?= h((string)($reportingLatestJob['error'] ?? 'Export failed.')) ?></span>
             <?php endif; ?>
