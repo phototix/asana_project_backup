@@ -1732,7 +1732,7 @@ if ($route === 'reports') {
     echo '.empty{background:#fffdf8;border:1px solid #ddd2bf;border-radius:8px;padding:1rem;color:#6d5f4e;}';
     echo '</style></head><body><div class="page">';
     echo '<header class="top"><div class="brand">KMSPKS UAT Reports</div><div>';
-    echo '<a class="btn" href="/">Backups</a><a class="btn" href="/reporting">Reporting</a><a class="btn" href="/logout">Logout</a>';
+    echo '<a class="btn" href="/">Backups</a><a class="btn" href="/reporting">Reporting</a><a class="btn" href="/reports/cms-managed.html">CMS</a><a class="btn" href="/logout">Logout</a>';
     echo '</div></header>';
 
     if ($authEnabled) {
@@ -1848,6 +1848,7 @@ if (str_starts_with($route, 'reports/')) {
       <a class="btn" style="margin-left:0.55rem;" href="/">Backups</a>
       <a class="btn" style="margin-left:0.55rem;" href="/reporting">Reporting</a>
       <a class="btn" style="margin-left:0.55rem;" href="/reports">Reports</a>
+      <a class="btn" style="margin-left:0.55rem;" href="/reports/cms-managed.html">CMS</a>
       <a class="btn" style="margin-left:0.55rem;" href="/logout">Logout</a>
     </div>
   <?php endif; ?>

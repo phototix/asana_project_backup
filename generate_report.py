@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 TASK_URL = "https://app.asana.com/1/1610754927873/project/1212423157941626/task/{gid}"
+PREPROD_BASE = "https://pre-prod.d2x7klqewcc6th.amplifyapp.com"
 
 PAGE = """<!doctype html>
 <html lang="en">
@@ -38,6 +39,9 @@ body{{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times 
 .content h3{{font-size:1.02rem;margin:1.2rem 0 .4rem}}
 .content p{{margin:.55rem 0}}
 .content a{{color:var(--accent);overflow-wrap:anywhere}}
+.btn-view{{display:inline-block;border:1px solid #d8c9b2;background:#fff;color:#5c3a1f;border-radius:6px;padding:.28rem .55rem;font-family:Arial,Helvetica,sans-serif;font-size:.8rem;text-decoration:none;white-space:nowrap;margin:.1rem .25rem .1rem 0}}
+.btn-view:hover{{background:#f9f2e6;text-decoration:none}}
+.preprod-path{{color:var(--muted);font-family:Arial,Helvetica,sans-serif;font-size:.8rem;margin:0 0 .25rem;overflow-wrap:anywhere}}
 .content strong{{font-weight:700}}
 .content code{{background:#f0e6d7;border-radius:4px;padding:.1rem .25rem;font-size:.9em}}
 .content hr{{border:0;border-top:1px solid var(--line);margin:1.2rem 0}}
@@ -53,7 +57,7 @@ tr:last-child td{{border-bottom:none}}
 .badge.fail{{background:var(--failbg);color:var(--fail);border:1px solid #e2b8b0}}
 .badge.review{{background:var(--reviewbg);color:var(--review);border:1px solid #e1c89f}}
 footer{{margin-top:2rem;border-top:1px solid var(--line);padding-top:.8rem;color:var(--muted);font-size:.85rem}}
-@media print{{body{{background:#fff}}.top,.back,footer{{display:none}}.page{{max-width:none;padding:0}}.table-wrap{{overflow:visible;border:0}}th{{background:#eee}}tr{{break-inside:avoid}}a{{color:inherit;text-decoration:none}}}}
+@media print{{body{{background:#fff}}.top,.back,footer,.btn-view{{display:none}}.page{{max-width:none;padding:0}}.table-wrap{{overflow:visible;border:0}}th{{background:#eee}}tr{{break-inside:avoid}}a{{color:inherit;text-decoration:none}}}}
 </style>
 </head>
 <body>
@@ -62,7 +66,7 @@ footer{{margin-top:2rem;border-top:1px solid var(--line);padding-top:.8rem;color
 <div class="brand">KMSPKS UAT Reports</div>
 <a class="back" href="/reports">&larr; All reports</a>
 </header>
-<div class="meta">Generated {generated} SGT</div>
+<div class="meta">Generated {generated} SGT · Report reference: {reference}</div>
 <article class="content">
 {content}
 </article>
@@ -144,6 +148,39 @@ def render_cell(cell):
     return render_inline(value)
 
 
+def render_preprod_cell(cell):
+    value = cell.strip()
+    if not value:
+        return ""
+    paths = [part.strip() for part in re.split(r"\s+and\s+|\n+", value) if part.strip()]
+    if not paths:
+        return render_inline(value)
+
+    buttons = []
+    for path in paths:
+        if path.lower() in ("n/a", "na", "-", "none"):
+            continue
+        if path.startswith("http://") or path.startswith("https://"):
+            url = path
+        else:
+            if not path.startswith("/"):
+                path = "/" + path
+            url = PREPROD_BASE + path
+        label = "View"
+        low = path.lower()
+        if "/zh/" in low or low.startswith("/zh"):
+            label = "View CN"
+        elif len(paths) > 1:
+            label = "View EN"
+        buttons.append(
+            f'<a class="btn-view" href="{html.escape(url, quote=True)}" target="_blank" '
+            f'rel="noopener noreferrer" title="Open pre-prod page in a new tab">{label}</a>'
+        )
+    if buttons:
+        return f'<div class="preprod-path">{html.escape(value, quote=False)}</div>' + " ".join(buttons)
+    return render_inline(value)
+
+
 def convert_markdown(markdown):
     lines = markdown.splitlines()
     out = []
@@ -188,14 +225,23 @@ def convert_markdown(markdown):
             while i < len(lines) and lines[i].strip().startswith("|"):
                 rows.append(split_row(lines[i]))
                 i += 1
+            preprod_col = None
+            for col_idx, cell in enumerate(header):
+                if cell.strip().lower() == "pre-prod page":
+                    preprod_col = col_idx
+                    break
+
             table = ['<div class="table-wrap"><table><thead><tr>']
             for cell in header:
                 table.append(f"<th>{render_inline(cell)}</th>")
             table.append("</tr></thead><tbody>")
             for row in rows:
                 table.append("<tr>")
-                for cell in row:
-                    table.append(f"<td>{render_cell(cell)}</td>")
+                for col_idx, cell in enumerate(row):
+                    if col_idx == preprod_col:
+                        table.append(f"<td>{render_preprod_cell(cell)}</td>")
+                    else:
+                        table.append(f"<td>{render_cell(cell)}</td>")
                 table.append("</tr>")
             table.append("</tbody></table></div>")
             out.append("".join(table))
@@ -263,6 +309,7 @@ def main():
         date_iso=when.strftime("%Y-%m-%dT%H:%M:00+08:00"),
         summary_attr=html.escape(args.summary, quote=True),
         generated=when.strftime("%d %b %Y, %I:%M %p"),
+        reference=html.escape(base, quote=False),
         content=convert_markdown(markdown),
     )
 

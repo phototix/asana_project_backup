@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CMS-managed issues — quick tracker</title>
+<meta name="report-title" content="CMS-managed issues — quick tracker">
+<meta name="report-date" content="2026-10-22T00:37:21+08:00">
+<meta name="report-summary" content="12 CMS-related items: 2 confirmed, 4 blocked or guidance, 5 display or editor issues, 1 status to confirm.">
+<style>
+:root{--bg:#f7f4ee;--panel:#fffdf8;--ink:#1f1a12;--muted:#6d5f4e;--line:#ddd2bf;--accent:#7d2b1f;--pass:#24522a;--passbg:#f0f7ee;--fail:#8c261a;--failbg:#fff0ee;--review:#6a4319;--reviewbg:#fff6e8;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.5}
+.page{max-width:1400px;margin:0 auto;padding:1.25rem}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;border-bottom:1px solid var(--line);padding-bottom:.8rem;margin-bottom:.9rem;flex-wrap:wrap}
+.brand{font-size:.85rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:1.6rem;margin:.15rem 0 .2rem}
+.meta{color:var(--muted);font-size:.9rem}
+.nav{display:flex;gap:.4rem;flex-wrap:wrap}
+.btn{display:inline-block;border:1px solid #d8c9b2;background:#fff;color:#5c3a1f;border-radius:6px;padding:.38rem .65rem;text-decoration:none;font-size:.86rem;font-family:Arial,Helvetica,sans-serif;cursor:pointer}
+.btn:hover{background:#f9f2e6;text-decoration:none}
+.note{background:#fffdf8;border:1px solid var(--line);border-radius:8px;padding:.65rem .8rem;margin:.4rem 0 1rem;color:var(--muted);font-size:.9rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.6rem;margin-bottom:1rem}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.75rem .85rem}
+.card .num{font-size:1.5rem;line-height:1;margin-bottom:.25rem}
+.card .label{color:var(--muted);font-size:.85rem}
+.filters{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.6rem 0 .8rem}
+.filters input,.filters select{border:1px solid #d8c9b2;background:#fff;color:#3b2f1f;border-radius:6px;padding:.42rem .6rem;font-size:.9rem}
+.filters input{min-width:250px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:1200px}
+th,td{border-bottom:1px solid #eee2cf;padding:.55rem .6rem;text-align:left;vertical-align:top}
+th{background:#f0e4d2;font-family:Arial,Helvetica,sans-serif;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;z-index:1}
+tr:last-child td{border-bottom:none}
+.group-tag{display:inline-block;border-radius:999px;padding:.14rem .45rem;font-family:Arial,Helvetica,sans-serif;font-size:.75rem;font-weight:700;white-space:nowrap}
+.group-tag.confirmed{background:var(--passbg);color:var(--pass);border:1px solid #bdd9b8}
+.group-tag.blocked{background:var(--reviewbg);color:var(--review);border:1px solid #e1c89f}
+.group-tag.display{background:var(--failbg);color:var(--fail);border:1px solid #e2b8b0}
+.group-tag.confirm{background:#eef3f8;color:#274b6d;border:1px solid #b9cfe2}
+.badge{display:inline-block;border-radius:999px;padding:.12rem .48rem;font-family:Arial,Helvetica,sans-serif;font-size:.75rem;font-weight:700;white-space:nowrap}
+.badge.pass{background:var(--passbg);color:var(--pass);border:1px solid #bdd9b8}
+.badge.fail{background:var(--failbg);color:var(--fail);border:1px solid #e2b8b0}
+.badge.review{background:var(--reviewbg);color:var(--review);border:1px solid #e1c89f}
+.ticket-name{font-weight:700;margin-bottom:.2rem}
+.ticket-link{color:var(--accent);font-size:.85rem;text-decoration:none}
+.ticket-link:hover{text-decoration:underline}
+.preprod-path{color:var(--muted);font-family:Arial,Helvetica,sans-serif;font-size:.78rem;margin:0 0 .25rem;overflow-wrap:anywhere}
+.btn-view{display:inline-block;border:1px solid #d8c9b2;background:#fff;color:#5c3a1f;border-radius:6px;padding:.25rem .5rem;font-family:Arial,Helvetica,sans-serif;font-size:.78rem;text-decoration:none;white-space:nowrap;margin:.1rem .25rem .1rem 0}
+.btn-view:hover{background:#f9f2e6;text-decoration:none}
+.muted{color:var(--muted)}
+footer{margin-top:1.2rem;border-top:1px solid var(--line);padding-top:.7rem;color:var(--muted);font-size:.82rem}
+@media print{
+  body{background:#fff}
+  .top,.nav,.filters,.note,footer,.btn-view,.ticket-link{display:none}
+  .page{max-width:none;padding:0}
+  .table-wrap{overflow:visible;border:0}
+  table{min-width:0;font-size:.8rem}
+  th{position:static;background:#eee}
+  tr{break-inside:avoid}
+  .cards{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+  <div>
+    <div class="brand">KMSPKS UAT</div>
+    <h1>CMS-managed issues</h1>
+    <div class="meta">Quick tracker · Last updated 22 Oct 2026, 12:37 AM SGT</div>
+  </div>
+  <nav class="nav">
+    <a class="btn" href="/reports/">Reports</a>
+    <a class="btn" href="/">Backups</a>
+    <a class="btn" href="/reports/cms-managed.html">Reload</a>
+    <a class="btn" href="/logout">Logout</a>
+  </nav>
+</header>
+
+<div class="note">CMS access is private. This tracker never stores CMS credentials. Use your saved CMS link to manage the content. The Asana and pre-prod links open in a new tab. This is a static snapshot; rerun the tracker generator to refresh the Asana status.</div>
+
+<div class="cards">
+<div class="card"><div class="num">2</div><div class="label">Confirmed CMS-managed</div></div><div class="card"><div class="num">4</div><div class="label">CMS content blocked or guidance needed</div></div><div class="card"><div class="num">5</div><div class="label">CMS display or editor issue</div></div><div class="card"><div class="num">1</div><div class="label">CMS status to confirm</div></div>
+</div>
+
+<div class="filters">
+  <input id="search" type="search" placeholder="Search ticket, feedback or action..." oninput="applyFilters()">
+  <select id="groupFilter" onchange="applyFilters()">
+    <option value="">All groups</option>
+    <option value="confirmed">Confirmed CMS-managed</option><option value="blocked">CMS content blocked or guidance needed</option><option value="display">CMS display or editor issue</option><option value="confirm">CMS status to confirm</option>
+  </select>
+  <select id="statusFilter" onchange="applyFilters()">
+    <option value="">All statuses</option>
+    <option value="Client to verify">Client to verify</option><option value="Fail (To fix again)">Fail (To fix again)</option><option value="Fix In Progress">Fix In Progress</option><option value="Open Tickets">Open Tickets</option><option value="QA to verify">QA to verify</option>
+  </select>
+  <button class="btn" type="button" onclick="window.print()">Print</button>
+  <button class="btn" type="button" onclick="downloadCsv()">Download CSV</button>
+</div>
+
+<div class="table-wrap">
+<table id="cmsTable">
+<thead><tr><th>Group</th><th>Ticket</th><th>Feedback</th><th>What to manage</th><th>Status</th><th>Assignee</th><th>Requester</th><th>Pre-prod</th><th>Last updated</th></tr></thead>
+<tbody>
+<tr data-group="confirmed" data-status="Client to verify"><td><span class="group-tag confirmed">Confirmed CMS-managed</span></td><td><div class="ticket-name">[Web] - Join Us - Bright Youth - Intro Copy</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219730214216446" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Zin: the Bright Youth intro is CMS-managed. Please update the EN/CN copy in the CMS.</td><td>Update the Bright Youth intro EN/CN copy in the CMS and verify on pre-prod.</td><td><span class="badge review">Client to verify</span></td><td>Brandon</td><td>Chang Xiu Mei</td><td><div class="preprod-path">/join-us/bright-youth</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/join-us/bright-youth" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View</a></td><td>22 Oct 2026, 12:00 AM</td></tr>
+<tr data-group="confirmed" data-status="Client to verify"><td><span class="group-tag confirmed">Confirmed CMS-managed</span></td><td><div class="ticket-name">[Web] Follow Us social media icon links</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219573809552366" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Zin: the social media links can be updated in the CMS.</td><td>Update the LinkedIn, WhatsApp and Xiaohongshu links in the CMS and verify.</td><td><span class="badge review">Client to verify</span></td><td>Dexter</td><td>Chang Xiu Mei</td><td><div class="preprod-path">/ and /contact-us</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View EN</a> <a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/contact-us" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View EN</a></td><td>21 Oct 2026, 03:29 PM</td></tr>
+<tr data-group="blocked" data-status="Client to verify"><td><span class="group-tag blocked">CMS content blocked or guidance needed</span></td><td><div class="ticket-name">[Web] Contact Us - Subject dropdown internal labels</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219584601884997" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Dexter: change the labels in Contact Management &gt; Contact Us &gt; Subject Master Data. A CMS access error was reported.</td><td>Fix CMS access, update the enquiry category labels and verify.</td><td><span class="badge review">Client to verify</span></td><td>Dexter</td><td>Chang Xiu Mei</td><td><div class="preprod-path">/contact-us</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/contact-us" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View</a></td><td>19 Oct 2026, 02:08 PM</td></tr>
+<tr data-group="blocked" data-status="Fix In Progress"><td><span class="group-tag blocked">CMS content blocked or guidance needed</span></td><td><div class="ticket-name">[Web] Contact Us - Incomplete department contact details</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219584933906424" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Ticket: Contact Us CMS error. Department contact content is incomplete.</td><td>Fix the Contact Us CMS error, update department names, descriptions, phone and email, then verify.</td><td><span class="badge review">Fix In Progress</span></td><td>Danh</td><td>Chang Xiu Mei</td><td><div class="preprod-path">/contact-us</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/contact-us" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View</a></td><td>19 Oct 2026, 02:05 PM</td></tr>
+<tr data-group="blocked" data-status="Fix In Progress"><td><span class="group-tag blocked">CMS content blocked or guidance needed</span></td><td><div class="ticket-name">[CMS] Things to note description</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219477239416627" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Ticket: the CMS description has a 500-character limit. Images are not required for now.</td><td>Remove the 500-character limit, update the description and verify.</td><td><span class="badge review">Fix In Progress</span></td><td>Dexter</td><td>Si Hui, carrlinfong@kmspks.org</td><td><span class="muted">CMS only</span></td><td>21 Oct 2026, 03:29 PM</td></tr>
+<tr data-group="blocked" data-status="Fix In Progress"><td><span class="group-tag blocked">CMS content blocked or guidance needed</span></td><td><div class="ticket-name">[Web &amp; CMS] Contents not loading and unable to update</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219526058649071" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Zin: only the title and description of two locations can be edited. The CMS path is unclear.</td><td>Confirm the CMS path, update the title and description, and standardise the Dharma School content.</td><td><span class="badge review">Fix In Progress</span></td><td>Dexter</td><td>-</td><td><div class="preprod-path">/dharma-education/school/location</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/dharma-education/school/location" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View</a></td><td>19 Oct 2026, 02:43 PM</td></tr>
+<tr data-group="display" data-status="Fail (To fix again)"><td><span class="group-tag display">CMS display or editor issue</span></td><td><div class="ticket-name">[Web] Awaken Online - Articles - Text interface</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219575656532229" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Zin: paragraph breaks entered in the CMS are not reflected on the website. The page is gone after the CMS update.</td><td>Fix the CMS paragraph rendering and page loading, then verify.</td><td><span class="badge fail">Fail (To fix again)</span></td><td>-</td><td>ruiying@kmspks.org</td><td><div class="preprod-path">/awaken-online/articles</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/awaken-online/articles" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View</a></td><td>21 Oct 2026, 10:06 PM</td></tr>
+<tr data-group="display" data-status="Fail (To fix again)"><td><span class="group-tag display">CMS display or editor issue</span></td><td><div class="ticket-name">[Web &amp; CMS] Privacy Policy, Terms &amp; Condition &amp; Whistleblower Policy </div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219570600171995" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Zin: paragraph spacing from the CMS is missing. The Terms and Conditions CMS editor shows an application error.</td><td>Fix the CMS paragraph spacing and the Terms and Conditions editor, then verify all three pages.</td><td><span class="badge fail">Fail (To fix again)</span></td><td>Kaung Myat Hein</td><td>Chang Xiu Mei</td><td><div class="preprod-path">/privacy-policy and /terms-and-conditions and /whistleblower-policy</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/privacy-policy" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View EN</a> <a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/terms-and-conditions" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View EN</a> <a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/whistleblower-policy" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View EN</a></td><td>21 Oct 2026, 08:50 PM</td></tr>
+<tr data-group="display" data-status="QA to verify"><td><span class="group-tag display">CMS display or editor issue</span></td><td><div class="ticket-name">[Web] Awaken Online - Publication - Publish Date not showing</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219575486359563" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Zin: the publish date is missing from the CMS listing and detail view for publications.</td><td>Fix or verify the publish date field in the CMS and on pre-prod.</td><td><span class="badge review">QA to verify</span></td><td>Danh</td><td>ruiying@kmspks.org</td><td><div class="preprod-path">/awaken-online/books</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/awaken-online/books" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View</a></td><td>21 Oct 2026, 10:46 AM</td></tr>
+<tr data-group="display" data-status="QA to verify"><td><span class="group-tag display">CMS display or editor issue</span></td><td><div class="ticket-name">[Web] Awaken Online - Awaken Magazine - Publish Date not showing</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219575656344472" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Zin: the publish date column is not visible in the CMS listing for Awaken Magazine.</td><td>Fix or verify the publish date column and field.</td><td><span class="badge review">QA to verify</span></td><td>Danh</td><td>ruiying@kmspks.org</td><td><div class="preprod-path">/awaken-online/magazines</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/awaken-online/magazines" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View</a></td><td>21 Oct 2026, 10:46 AM</td></tr>
+<tr data-group="display" data-status="Open Tickets"><td><span class="group-tag display">CMS display or editor issue</span></td><td><div class="ticket-name">[Web] - E-Store - Product Chinese name not shown </div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1219692039810792" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Zin: the product Chinese name is saved in the CMS but the storefront shows English. Backend may be involved.</td><td>Fix the CMS-to-storefront display and verify the Chinese locale.</td><td><span class="badge review">Open Tickets</span></td><td>Kaung Myat Hein</td><td>-</td><td><div class="preprod-path">/e-store and /zh/e-store</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/e-store" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View EN</a> <a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/zh/e-store" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View CN</a></td><td>21 Oct 2026, 07:39 PM</td></tr>
+<tr data-group="confirm" data-status="Open Tickets"><td><span class="group-tag confirm">CMS status to confirm</span></td><td><div class="ticket-name">[Web] – Dharma School Page Banner Image</div><a class="ticket-link" href="https://app.asana.com/1/1610754927873/project/1212423157941626/task/1213988637581792" target="_blank" rel="noopener noreferrer">Open ticket</a></td><td>Zin: confirm whether the Dharma School banner and hover-menu images are hardcoded or CMS-managed. The CMS paths show no editable landing form.</td><td>Confirm the CMS status, provide the required image sizes and update the images.</td><td><span class="badge review">Open Tickets</span></td><td>Zin Hnin</td><td>Bee Neo</td><td><div class="preprod-path">/dharma-education/school/an-overview</div><a class="btn-view" href="https://pre-prod.d2x7klqewcc6th.amplifyapp.com/dharma-education/school/an-overview" target="_blank" rel="noopener noreferrer" title="Open pre-prod page in a new tab">View</a></td><td>21 Oct 2026, 07:39 PM</td></tr>
+</tbody>
+</table>
+</div>
+
+<footer>CMS-managed tracker generated from live Asana data. No Asana data was changed.</footer>
+</div>
+<script>
+function applyFilters(){
+  const q=(document.getElementById('search').value||'').toLowerCase();
+  const g=document.getElementById('groupFilter').value;
+  const s=document.getElementById('statusFilter').value;
+  document.querySelectorAll('#cmsTable tbody tr').forEach(function(tr){
+    const text=(tr.innerText||'').toLowerCase();
+    const ok=(!q||text.indexOf(q)!==-1)&&(!g||tr.getAttribute('data-group')===g)&&(!s||tr.getAttribute('data-status')===s);
+    tr.style.display=ok?'':'none';
+  });
+}
+function csvCell(value){
+  return '"'+String(value||'').replace(/"/g,'""')+'"';
+}
+function downloadCsv(){
+  const table=document.getElementById('cmsTable');
+  const lines=[];
+  const headers=Array.from(table.querySelectorAll('thead th')).map(function(th){return csvCell(th.innerText.trim());});
+  lines.push(headers.join(','));
+  table.querySelectorAll('tbody tr').forEach(function(tr){
+    if(tr.style.display==='none') return;
+    const cells=Array.from(tr.querySelectorAll('td')).map(function(td){return csvCell(td.innerText.trim());});
+    if(cells.length) lines.push(cells.join(','));
+  });
+  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);
+  link.download='cms-managed.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+</script>
+</body>
+</html>
