@@ -10,6 +10,7 @@ $envFile = $webRoot . '/.env';
 $backupEnvFile = '/opt/asana-backup/.env';
 $authAttemptsFile = $webRoot . '/data/auth-attempts.json';
 $reportingExportsDir = $webRoot . '/files/reporting';
+$reportsDir = $webRoot . '/reports-data';
 $reportingDownloadsFile = $webRoot . '/data/reporting-downloads.json';
 $reportingExportJobsFile = $webRoot . '/data/reporting-export-jobs.json';
 $reportingExportLockFile = $webRoot . '/data/reporting-export.lock';
@@ -53,6 +54,30 @@ function load_env_vars(string $path): array {
 
 function h(string $value): string {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function report_meta(string $path): array {
+    $head = @file_get_contents($path, false, null, 0, 16384);
+    if (!is_string($head)) {
+        $head = '';
+    }
+
+    $title = '';
+    if (preg_match('/<title[^>]*>(.*?)<\/title>/is', $head, $m)) {
+        $title = html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    $date = '';
+    if (preg_match('/<meta\s+name="report-date"\s+content="([^"]*)"/i', $head, $m)) {
+        $date = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    $summary = '';
+    if (preg_match('/<meta\s+name="report-summary"\s+content="([^"]*)"/i', $head, $m)) {
+        $summary = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    return [$title, $date, $summary];
 }
 
 function client_ip(): string {
@@ -1689,6 +1714,68 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
     stream_zip_entry($zipPath, $savedAs, $assetType !== 'attachment-preview');
 }
 
+if ($route === 'reports') {
+    $reportFiles = glob($reportsDir . '/*.html') ?: [];
+    usort($reportFiles, static fn (string $a, string $b): int => strcmp(basename($b), basename($a)));
+
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<title>Reports - Asana Backups</title><style>';
+    echo 'body{font-family:Georgia,"Times New Roman",serif;background:#f7f4ee;color:#1f1a12;margin:0;padding:1.25rem;box-sizing:border-box;}';
+    echo '.page{max-width:1000px;margin:0 auto;}a{color:#7d2b1f;text-decoration:none;}a:hover{text-decoration:underline;}';
+    echo '.top{display:flex;justify-content:space-between;align-items:center;gap:1rem;border-bottom:1px solid #ddd2bf;padding-bottom:.75rem;margin-bottom:1rem;flex-wrap:wrap;}';
+    echo '.brand{font-size:1.15rem;}.btn{display:inline-block;border:1px solid #d8c9b2;background:#fff;color:#5c3a1f;border-radius:6px;padding:.4rem .7rem;text-decoration:none;font-size:.9rem;margin-left:.4rem;}';
+    echo '.btn:hover{background:#f9f2e6;text-decoration:none;}.card{background:#fffdf8;border:1px solid #ddd2bf;border-radius:8px;padding:1rem;margin-bottom:1rem;}';
+    echo '.card h2{margin:0 0 .35rem;font-size:1.1rem;}.muted{color:#6d5f4e;font-size:.9rem;}.summary{margin:.55rem 0 .7rem;}';
+    echo '.empty{background:#fffdf8;border:1px solid #ddd2bf;border-radius:8px;padding:1rem;color:#6d5f4e;}';
+    echo '</style></head><body><div class="page">';
+    echo '<header class="top"><div class="brand">KMSPKS UAT Reports</div><div>';
+    echo '<a class="btn" href="/">Backups</a><a class="btn" href="/reporting">Reporting</a><a class="btn" href="/logout">Logout</a>';
+    echo '</div></header>';
+
+    if ($authEnabled) {
+        echo '<p class="muted">Signed in as <strong>' . h((string)($_SESSION['auth_username'] ?? 'user')) . '</strong></p>';
+    }
+
+    if (empty($reportFiles)) {
+        echo '<div class="empty">No reports have been published yet.</div>';
+    } else {
+        foreach ($reportFiles as $reportFile) {
+            [$reportTitle, $reportDate, $reportSummary] = report_meta($reportFile);
+            $reportName = basename($reportFile);
+            $reportUrl = '/reports/' . rawurlencode($reportName);
+            echo '<div class="card"><h2><a href="' . h($reportUrl) . '">' . h($reportTitle !== '' ? $reportTitle : $reportName) . '</a></h2>';
+            echo '<div class="muted">' . h($reportDate !== '' ? format_datetime($reportDate) : '') . '</div>';
+            if ($reportSummary !== '') {
+                echo '<p class="summary">' . h($reportSummary) . '</p>';
+            }
+            echo '<a class="btn" style="margin-left:0;" href="' . h($reportUrl) . '">View report</a></div>';
+        }
+    }
+
+    echo '</div></body></html>';
+    exit;
+}
+
+if (preg_match('#^reports/([A-Za-z0-9._-]+\.html)$#', $route, $m)) {
+    $reportName = $m[1];
+    $reportPath = $reportsDir . '/' . $reportName;
+    if (basename($reportName) !== $reportName || !is_file($reportPath)) {
+        send_not_found();
+    }
+
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    readfile($reportPath);
+    exit;
+}
+
+if (str_starts_with($route, 'reports/')) {
+    send_not_found();
+}
+
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -1760,6 +1847,7 @@ if (preg_match('#^view/([a-z0-9-]+)/([^/]+)/(attachment|attachment-preview|inlin
       Signed in as <strong><?= h((string)($_SESSION['auth_username'] ?? 'user')) ?></strong>
       <a class="btn" style="margin-left:0.55rem;" href="/">Backups</a>
       <a class="btn" style="margin-left:0.55rem;" href="/reporting">Reporting</a>
+      <a class="btn" style="margin-left:0.55rem;" href="/reports">Reports</a>
       <a class="btn" style="margin-left:0.55rem;" href="/logout">Logout</a>
     </div>
   <?php endif; ?>
