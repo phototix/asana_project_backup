@@ -141,8 +141,12 @@ def render_cell(cell):
     if (
         low.startswith("needs review")
         or low.startswith("needs manual")
-        or low.startswith("pending verification")
+        or low.startswith("pending")
         or low == "client to verify"
+        or low.startswith("qa")
+        or low.startswith("to update hardcoded")
+        or low.startswith("new request")
+        or low == "open tickets"
     ):
         return f'<span class="badge review">{render_inline(value)}</span>'
     return render_inline(value)
