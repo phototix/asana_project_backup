@@ -87,6 +87,7 @@ PATHS = {
     "1219573589963215": ["/"],
     "1219692039810792": ["/e-store", "/zh/e-store"],
     "1219584933906424": ["/contact-us"],
+    "1219920563795319": ["/contact-us"],
     "1219575656532229": ["/awaken-online/articles"],
     "1213988637581792": ["/dharma-education/school/an-overview"],
     "1219575481338668": ["/awaken-online/articles"],

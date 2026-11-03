@@ -118,6 +118,14 @@ ITEMS = [
         "action": "Confirm the CMS status, provide the required image sizes and update the images.",
         "paths": ["/dharma-education/school/an-overview"],
     },
+    {
+        "gid": "1219920563795319",
+        "group": "CMS status to confirm",
+        "key": "confirm",
+        "feedback": "Xiu Mei (Marcomm): the confirmed 14-department contact list must be editable in the CMS. Department names, descriptions, telephone, WhatsApp, email and fax should all be manageable.",
+        "action": "Confirm every department and field is editable in the CMS, apply the confirmed list, and verify on pre-prod.",
+        "paths": ["/contact-us"],
+    },
 ]
 
 GROUP_ORDER = [
@@ -141,7 +149,7 @@ PAGE = Template("""<!doctype html>
 <title>CMS-managed issues — quick tracker</title>
 <meta name="report-title" content="CMS-managed issues — quick tracker">
 <meta name="report-date" content="$date_iso">
-<meta name="report-summary" content="12 CMS-related items: 2 confirmed, 4 blocked or guidance, 5 display or editor issues, 1 status to confirm.">
+<meta name="report-summary" content="13 CMS-related items: 2 confirmed, 4 blocked or guidance, 5 display or editor issues, 2 status to confirm.">
 <style>
 :root{--bg:#f7f4ee;--panel:#fffdf8;--ink:#1f1a12;--muted:#6d5f4e;--line:#ddd2bf;--accent:#7d2b1f;--pass:#24522a;--passbg:#f0f7ee;--fail:#8c261a;--failbg:#fff0ee;--review:#6a4319;--reviewbg:#fff6e8;}
 *{box-sizing:border-box}

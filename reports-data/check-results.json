@@ -1,0 +1,96 @@
+{
+  "generated_at": "2026-11-02T16:15:01+08:00",
+  "source": "pre-prod staging API and __NEXT_DATA__ labels",
+  "results": {
+    "1219729871681039": {
+      "result": "Fail",
+      "label": "Automated check",
+      "evidence": "The Home section label is “最新活动”; expected “近期活动”.",
+      "action": "Dexter to update the Home Upcoming Activities Chinese label and verify."
+    },
+    "1219730157051326": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "The Bright Youth top banner image requires a visual check.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219730041124358": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Both “btnApply” (CN 确定) and “btnCareerApply” (CN 申请) exist; confirm which button is rendered.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219730152343193": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Chinese text visibility on the Career page requires a visual/interaction check.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219729885998686": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Removal of the Career divider image requires a visual check.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219730214723788": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Banner text is Careers / 招聘; the updated banner image requires a visual check.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219730214602139": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "API pageBreakImage is null; confirm visually that the redundant divider is gone.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219730157523754": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Gallery and Upcoming Activities order requires a visual check.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219729884657529": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "The new intro copy is live, but the intro button still reads “Join Now” / “立即加入” instead of “Volunteer” / “护法义工”; the label is not controlled by the CMS.",
+      "action": "Assign an owner to change the intro button label; it is not controlled by the CMS."
+    },
+    "1219730156544417": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Banner title/subtitle and image require a visual check.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219566240500914": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Deleting the test records requires a manual CMS test.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219477239250114": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "CMS UI check required; the edit icon is not testable from the pre-prod front end.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219575656937178": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Audio player and YouTube-link playback require a manual check on a digital post.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219575486874259": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Multiple-track upload and playback require a manual CMS check.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    },
+    "1219584776062295": {
+      "result": "Needs manual review",
+      "label": "Needs manual review",
+      "evidence": "Submission-failure handling requires a controlled manual test; do not submit the live form.",
+      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    }
+  }
+}

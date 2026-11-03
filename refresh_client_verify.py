@@ -7,6 +7,7 @@ tickets. No Asana writes.
 """
 
 import html
+import json
 import re
 import sys
 from collections import Counter
@@ -20,6 +21,7 @@ from generate_report import render_preprod_cell
 
 SGT = timezone(timedelta(hours=8))
 PAGE = Path(__file__).resolve().parent / "reports-data" / "client-verify.html"
+RESULTS_PATH = Path(__file__).resolve().parent / "reports-data" / "check-results.json"
 TOKEN = load_env(ENV_PATH)["ASANA_TOKEN"]
 SECTION_GID = "1212426681919491"
 
@@ -36,70 +38,35 @@ NEW_PATHS = {
     "1219584601884997": ["/contact-us"],
     "1219584909565579": ["/contact-us"],
     "1219584776062295": ["/contact-us"],
+    "1219920563795319": ["/contact-us", "/zh/contact-us"],
+    "1219573589963215": ["/", "/zh/"],
+    "1219692039810792": ["/e-store", "/zh/e-store"],
+    "1219729871681039": ["/", "/zh/"],
+    "1219729872441193": ["/join-us/bright-youth", "/zh/join-us/bright-youth"],
+    "1219729884657529": ["/join-us/be-a-volunteer", "/zh/join-us/be-a-volunteer"],
+    "1219729885362231": ["/join-us/bright-youth", "/zh/join-us/bright-youth"],
+    "1219729885418308": ["/join-us/be-a-volunteer", "/zh/join-us/be-a-volunteer"],
+    "1219729885998686": ["/join-us/career", "/zh/join-us/career"],
+    "1219729966737873": ["/", "/zh/"],
+    "1219730038770916": ["/", "/zh/"],
+    "1219730040037065": ["/join-us/joyous-heart", "/zh/join-us/joyous-heart"],
+    "1219730041124358": ["/join-us/career", "/zh/join-us/career"],
+    "1219730152343193": ["/join-us/career", "/zh/join-us/career"],
+    "1219730156544417": ["/join-us/be-a-volunteer", "/zh/join-us/be-a-volunteer"],
+    "1219730157051326": ["/join-us/bright-youth", "/zh/join-us/bright-youth"],
+    "1219730157523754": ["/join-us/joyous-heart", "/zh/join-us/joyous-heart"],
+    "1219730214000918": ["/join-us/bright-youth", "/zh/join-us/bright-youth"],
+    "1219730214327943": ["/join-us/joyous-heart", "/zh/join-us/joyous-heart"],
+    "1219730214602139": ["/join-us/joyous-heart", "/zh/join-us/joyous-heart"],
+    "1219730214723788": ["/join-us/career", "/zh/join-us/career"],
+    "1219746446656349": ["/join-us/be-a-volunteer", "/zh/join-us/be-a-volunteer"],
 }
 
-CHECKS = {
-    "1219730158203178": {
-        "result": "Content action",
-        "evidence": "Expected Walk-In Interview copy and schedule not found in the server-rendered page. Update the content in the CMS and verify.",
-        "action": "Update the CMS content and verify.",
-    },
-    "1219730215265066": {
-        "result": "Content action",
-        "evidence": "Expected How to Apply copy not found in the server-rendered page. Update the content in the CMS and verify.",
-        "action": "Update the CMS content and verify.",
-    },
-    "1219729872643659": {
-        "result": "Content action",
-        "evidence": "Expected Four Pillars header/intro not found in the server-rendered page. Update the remaining content in the CMS and verify.",
-        "action": "Update the CMS content and verify.",
-    },
-    "1219477239250114": {
-        "result": "Needs manual review",
-        "evidence": "CMS UI check required; the front end cannot confirm the edit icon.",
-        "action": "Brandon to check manually; update Dexter only if a defect is found.",
-    },
-    "1219575481392590": {
-        "result": "Pass",
-        "evidence": "Found “Digital Content” on /awaken-online/digital and “数位资源” on /zh/awaken-online/digital.",
-        "action": "Pass; Dexter to confirm and close.",
-    },
-    "1219575604575951": {
-        "result": "Needs manual review",
-        "evidence": "CMS field limit/title check required; not verified from the pre-prod page.",
-        "action": "Brandon to check manually; update Dexter only if a defect is found.",
-    },
-    "1219575656937178": {
-        "result": "Needs manual review",
-        "evidence": "Audio player check required on a digital post; not verified from the listing page.",
-        "action": "Brandon to check manually; update Dexter only if a defect is found.",
-    },
-    "1219575486816225": {
-        "result": "Fail",
-        "evidence": "Neither “Featured” nor “精选” was found on /awaken-online/digital.",
-        "action": "Dexter to update the Featured label and verify.",
-    },
-    "1219584776062295": {
-        "result": "Needs manual review",
-        "evidence": "Submission failure test must be checked manually.",
-        "action": "Brandon to check manually; update Dexter only if a defect is found.",
-    },
-    "1219584601884997": {
-        "result": "Needs manual review",
-        "evidence": "Internal labels are absent, but the new enquiry categories still need confirmation.",
-        "action": "Brandon to check manually; update Dexter only if a defect is found.",
-    },
-    "1219584909565579": {
-        "result": "Needs manual review",
-        "evidence": "Form submission and mailbox delivery must be checked manually.",
-        "action": "Brandon to check manually; update Dexter only if a defect is found.",
-    },
-    "1219573809552366": {
-        "result": "Fail",
-        "evidence": "Only the Facebook link was found. Instagram, YouTube, LinkedIn, WhatsApp and Xiaohongshu are missing.",
-        "action": "Dexter to update the social links and verify.",
-    },
-}
+CHECKS = {}
+
+if RESULTS_PATH.exists():
+    payload = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
+    CHECKS = payload.get("results", payload)
 
 
 def badge_for(result):
@@ -179,6 +146,16 @@ def next_action(live, assignee, result):
     return "Review and follow up."
 
 
+def change_for(live, prior_live):
+    if live == "Closed":
+        return "Closed since last run" if prior_live != "Closed" else "No change"
+    if prior_live == live:
+        return "No change"
+    if live == "Client to verify":
+        return "Moved to Client to verify"
+    return f"Moved to {live}"
+
+
 def main():
     old = PAGE.read_text(encoding="utf-8")
     style = re.search(r"<style>(.*?)</style>", old, re.S)
@@ -243,33 +220,26 @@ table{min-width:1800px}
 
     for gid, item in existing.items():
         live, assignee, _ = live_state(gid)
+        codigo = latest_comment(gid) if live == "Client to verify" else item["codigo"]
         check = CHECKS.get(gid)
         if check:
             result = check["result"]
-            ticket = relabel_ticket(item["ticket"], ticket_label(result))
+            ticket = relabel_ticket(item["ticket"], check.get("label") or ticket_label(result))
             result_cell = badge_for(result)
             evidence = check["evidence"]
             action = "None; closed." if live == "Closed" else check["action"]
-            if live == "Closed":
-                change = "Closed since last run" if item["prior_live"] != "Closed" else "No change"
-            else:
-                change = "Added to Client to verify"
+            change = change_for(live, item["prior_live"])
         else:
             result = item["result"]
             ticket = item["ticket"]
             result_cell = item["result_cell"]
             evidence = item["evidence"]
-            if live == "Closed":
-                change = "Closed since last run" if item["prior_live"] != "Closed" else "No change"
-            elif live == "Client to verify":
-                change = "No change" if item["prior_live"] in ("Client to verify", "With Dexter") else "Moved to Client to verify"
-            else:
-                change = "No change"
+            change = change_for(live, item["prior_live"])
             action = next_action(live, assignee, result)
         built.append({
             "gid": gid, "name": item["name"], "live": live, "assignee": assignee,
             "change": change, "result": result, "ticket": ticket, "asana": item["asana"],
-            "codigo": item["codigo"], "preprod": item["preprod"], "result_cell": result_cell,
+            "codigo": codigo, "preprod": item["preprod"], "result_cell": result_cell,
             "evidence": evidence, "action": action,
         })
         live_counts[live] += 1
@@ -288,7 +258,7 @@ table{min-width:1800px}
             result = check["result"]
             change = "Added to Client to verify" if live != "Closed" else "No change"
             action = "None; closed." if live == "Closed" else check["action"]
-            ticket_small = ticket_label(result)
+            ticket_small = check.get("label") or ticket_label(result)
             result_cell = badge_for(result)
             evidence = check["evidence"]
         else:
@@ -322,7 +292,9 @@ table{min-width:1800px}
     rows = []
     for r in built:
         live_class = {"Closed": "pass", "Client to verify": "review"}.get(r["live"], "fail" if r["live"].startswith("Fail") else "review")
-        change_class = {"Closed since last run": "closed", "Added to Client to verify": "added", "No change": "none"}.get(r["change"], "none")
+        change_class = {"Closed since last run": "closed", "Added to Client to verify": "added", "No change": "none"}.get(
+            r["change"], "added" if r["change"].startswith("Moved to ") else "none"
+        )
         rows.append(
             "<tr data-live=\"{live}\" data-assignee=\"{assignee}\" data-change=\"{change}\" data-result=\"{result}\">"
             "<td>{ticket}</td><td>{asana}</td>"
@@ -350,14 +322,18 @@ table{min-width:1800px}
         for v in ["Client to verify", "Closed"] + [v for v in live_counts if v not in ("Client to verify", "Closed")]
         if live_counts.get(v)
     )
+    assignee_values = [v for v in ["Brandon", "Dexter"] if any(k[1] == v for k in assignee_counts)]
+    if assignee_counts.get(("Client to verify", "-"), 0):
+        assignee_values.append("-")
     assignee_options = "".join(
-        f'<option value="{html.escape(v, quote=True)}">{html.escape(v)}</option>'
-        for v in ["Brandon", "Dexter"] if any(k[1] == v for k in assignee_counts)
+        f'<option value="{html.escape(v, quote=True)}">{html.escape("Unassigned" if v == "-" else v)}</option>'
+        for v in assignee_values
     )
+    change_values = [v for v in ["Closed since last run", "Added to Client to verify", "Moved to Client to verify"] if any(r["change"] == v for r in built)]
+    change_values += sorted({r["change"] for r in built if r["change"] not in change_values})
     change_options = "".join(
         f'<option value="{html.escape(v, quote=True)}">{html.escape(v)}</option>'
-        for v in ["Closed since last run", "Added to Client to verify", "No change"]
-        if any(r["change"] == v for r in built)
+        for v in change_values
     )
     result_options = "".join(
         f'<option value="{html.escape(v, quote=True)}">{html.escape(v)}</option>'
@@ -366,22 +342,37 @@ table{min-width:1800px}
 
     cb = assignee_counts.get(("Client to verify", "Brandon"), 0)
     cd = assignee_counts.get(("Client to verify", "Dexter"), 0)
+    cu = assignee_counts.get(("Client to verify", "-"), 0)
     added_count = sum(1 for r in built if r["change"] == "Added to Client to verify")
+    closed_count = sum(1 for r in built if r["change"] == "Closed since last run")
+    checked_count = sum(1 for r in built if r["gid"] in CHECKS)
     unchecked = result_counts.get("Not yet checked", 0)
+    moved_counts = Counter(r["change"] for r in built if r["change"].startswith("Moved to "))
+    move_bits = []
+    if closed_count:
+        move_bits.append(f"{closed_count} moved to Closed")
+    for change, count in moved_counts.items():
+        move_bits.append(f"{count} moved to {change.replace('Moved to ', '', 1)}")
+    move_text = "; ".join(move_bits)
     now = datetime.now(SGT)
     extra_cards = "".join(
         f'<div class="card"><div class="num">{count}</div><div class="label">{html.escape(live)}</div></div>'
         for live, count in live_counts.items()
         if live not in ("Client to verify", "Closed") and count
     )
+    unassigned_card = (
+        f'<div class="card"><div class="num">{cu}</div><div class="label">Client to verify — Unassigned</div></div>'
+        if cu
+        else ""
+    )
     cards = f"""<div class="card"><div class="num">{len(built)}</div><div class="label">Total</div></div>
 <div class="card"><div class="num">{live_counts.get("Closed",0)}</div><div class="label">Closed</div></div>
 <div class="card"><div class="num">{cb}</div><div class="label">Client to verify — Brandon</div></div>
-<div class="card"><div class="num">{cd}</div><div class="label">Client to verify — Dexter</div></div>{extra_cards}"""
+<div class="card"><div class="num">{cd}</div><div class="label">Client to verify — Dexter</div></div>{unassigned_card}{extra_cards}"""
     added_line = (
-        f"Added this run: {added_count} added, {unchecked} not yet checked."
+        f"Added this run: {added_count} new, {unchecked} not yet checked."
         if unchecked
-        else f"Added this run: {added_count} checked."
+        else f"Added this run: {added_count} new, {checked_count} checked."
     )
     summary_line = (
         f'<p class="small">Last automated pass: Pass {result_counts.get("Pass",0)} · '
@@ -390,17 +381,19 @@ table{min-width:1800px}
         f'Content action {result_counts.get("Content action",0)}. '
         f'{added_line}</p>'
     )
+    move_suffix = f"; {move_text}" if move_text else ""
     if unchecked:
         note = (
             f"Live status refreshed from Asana on {now.strftime('%d %b %Y, %I:%M %p')} SGT. "
-            f"{added_count} Client to verify tickets were added; {unchecked} are not yet checked. "
-            "No Asana data was changed."
+            f"{added_count} new ticket(s) added{move_suffix}; {unchecked} not yet checked; "
+            f"{cu} unassigned. No Asana writes by this refresh."
         )
     else:
         note = (
             f"Live status refreshed from Asana on {now.strftime('%d %b %Y, %I:%M %p')} SGT. "
-            f"Automated pre-checks completed for the {added_count} added rows; items marked Needs manual review still need a human check. "
-            "No Asana data was changed."
+            f"{added_count} new ticket(s) added{move_suffix}; {checked_count} rows checked; "
+            f"{cu} unassigned. Items marked Needs manual review still need a human check. "
+            "No Asana writes by this refresh."
         )
 
     document = f"""<!doctype html>
@@ -411,7 +404,7 @@ table{min-width:1800px}
 <title>Client verification — Client to verify</title>
 <meta name="report-title" content="Client verification — Client to verify">
 <meta name="report-date" content="{now.strftime('%Y-%m-%dT%H:%M:%S+08:00')}">
-<meta name="report-summary" content="{len(built)} tickets: {live_counts.get('Closed',0)} closed, {cb} client to verify (Brandon), {cd} client to verify (Dexter).">
+<meta name="report-summary" content="{len(built)} tickets: {live_counts.get('Closed',0)} closed, {cb} client to verify (Brandon), {cd} client to verify (Dexter), {cu} unassigned.">
 <style>{style_text}</style>
 </head>
 <body>
@@ -420,7 +413,7 @@ table{min-width:1800px}
   <div>
     <div class="brand">KMSPKS UAT</div>
     <h1>Client verification</h1>
-    <div class="meta">Client to verify · {live_counts.get("Client to verify",0)} in queue ({cb} Brandon, {cd} Dexter) · status refreshed {now.strftime('%d %b %Y, %I:%M %p')} SGT</div>
+    <div class="meta">Client to verify · {live_counts.get("Client to verify",0)} in queue ({cb} Brandon, {cd} Dexter, {cu} unassigned) · status refreshed {now.strftime('%d %b %Y, %I:%M %p')} SGT</div>
   </div>
   <nav class="nav">
     <a class="btn" href="/reports/">Reports</a>

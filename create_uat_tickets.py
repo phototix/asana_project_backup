@@ -42,7 +42,9 @@ COLLABORATORS_BY_SET = {
     "footer": [IVAN_GID, XIU_MEI_GID],
     "awaken": [IVAN_GID, RUI_YING_GID],
     "contact": [IVAN_GID, XIU_MEI_GID],
+    "department-contacts": [XIU_MEI_GID],
 }
+ASSIGNEE_BY_SET = {}
 AWAKEN_WORK_DIR = Path("/var/www/codigo.brandon.my/tmp/awaken")
 CONTACT_WORK_DIR = Path("/var/www/codigo.brandon.my/tmp/contact")
 
@@ -324,7 +326,7 @@ def sync_metadata(token: str, tickets: list, collaborators, dry_run: bool = Fals
     return 0
 
 
-def create_ticket(token: str, ticket: dict, collaborators):
+def create_ticket(token: str, ticket: dict, collaborators, assignee: str = None):
     notes = notes_for(ticket)
     attachments = ticket.get("attachments", [])
     data = {
@@ -347,6 +349,8 @@ def create_ticket(token: str, ticket: dict, collaborators):
         return task
     api_request(token, "POST", f"/sections/{SECTION_GID}/addTask", body={"data": {"task": task_gid}})
     apply_metadata(token, task_gid, collaborators)
+    if assignee:
+        api_request(token, "PUT", f"/tasks/{task_gid}", body={"data": {"assignee": assignee}})
     if attachments:
         gids = []
         for attachment in attachments:
@@ -361,7 +365,12 @@ def create_ticket(token: str, ticket: dict, collaborators):
 def main():
     parser = argparse.ArgumentParser(description="Create [KMS] Client UAT tickets in Asana.")
     parser.add_argument("--dry-run", action="store_true", help="Print payloads without calling Asana.")
-    parser.add_argument("--set", choices=["footer", "awaken", "contact"], default="footer", help="Ticket set to process.")
+    parser.add_argument(
+        "--set",
+        choices=["footer", "awaken", "contact", "department-contacts"],
+        default="footer",
+        help="Ticket set to process.",
+    )
     parser.add_argument(
         "--only",
         action="append",
@@ -385,6 +394,7 @@ def main():
         return 1
 
     collaborators = COLLABORATORS_BY_SET[args.set]
+    assignee = ASSIGNEE_BY_SET.get(args.set)
 
     if args.set == "awaken":
         import awaken_tickets
@@ -394,6 +404,10 @@ def main():
         import contact_tickets
 
         all_tickets = contact_tickets.build_tickets(CONTACT_WORK_DIR, token)
+    elif args.set == "department-contacts":
+        import department_contacts_tickets
+
+        all_tickets = department_contacts_tickets.build_tickets()
     else:
         all_tickets = TICKETS
 
@@ -424,7 +438,7 @@ def main():
             print(notes_for(ticket))
             print("-" * 60)
             continue
-        task = create_ticket(token, ticket, collaborators)
+        task = create_ticket(token, ticket, collaborators, assignee=assignee)
         created += 1
         print(f"CREATED {ticket['id']}: {task.get('name')} -> {task.get('permalink_url')}")
 
