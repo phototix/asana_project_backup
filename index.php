@@ -16,6 +16,10 @@ $reportingExportJobsFile = $webRoot . '/data/reporting-export-jobs.json';
 $reportingExportLockFile = $webRoot . '/data/reporting-export.lock';
 $route = trim((string)($_GET['route'] ?? ''), '/');
 
+require_once __DIR__ . '/taskmanager_client.php';
+require_once __DIR__ . '/taskmanager_reporting.php';
+require_once __DIR__ . '/taskmanager_auth.php';
+
 function load_env_vars(string $path): array {
     if (!is_file($path)) {
         return [];
@@ -838,7 +842,7 @@ function reporting_create_xlsx(array $headers, array $rows, string $tmpDir): str
         . '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
         . 'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" '
         . 'xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-        . '<dc:creator>Asana Backups</dc:creator><cp:lastModifiedBy>Asana Backups</cp:lastModifiedBy>'
+        . '<dc:creator>KMS Reporting</dc:creator><cp:lastModifiedBy>KMS Reporting</cp:lastModifiedBy>'
         . '<dcterms:created xsi:type="dcterms:W3CDTF">' . $nowUtc . '</dcterms:created>'
         . '<dcterms:modified xsi:type="dcterms:W3CDTF">' . $nowUtc . '</dcterms:modified>'
         . '</cp:coreProperties>';
@@ -869,7 +873,7 @@ function reporting_create_xlsx(array $headers, array $rows, string $tmpDir): str
     $zip->addFromString('docProps/app.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
         . 'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
-        . '<Application>Asana Backups</Application>'
+        . '<Application>KMS Reporting</Application>'
         . '</Properties>');
     $zip->addFromString('docProps/core.xml', $coreXml);
 
@@ -1411,9 +1415,8 @@ if (!$isAuthenticated) {
 $index = json_read($dataFile);
 $projects = $index['projects'] ?? [];
 $lastRun = json_read($lastRunFile);
-$reportingProject = is_array($projects[0] ?? null) ? $projects[0] : null;
-$reportingProjectGid = trim((string)($reportingProject['project_gid'] ?? ''));
-$reportingProjectName = trim((string)($reportingProject['project_name'] ?? ''));
+$reportingProjectGid = tm_project_id();
+$reportingProjectName = tm_project_name();
 $reportingDownloads = reporting_downloads_read($reportingDownloadsFile);
 $reportingExportJobs = reporting_export_jobs_read($reportingExportJobsFile);
 $reportingLatestJob = is_array($reportingExportJobs[0] ?? null) ? $reportingExportJobs[0] : null;
@@ -1423,6 +1426,101 @@ if (isset($_SESSION['reporting_notice'])) {
     unset($_SESSION['reporting_notice']);
 }
 $isViewerPageRoute = preg_match('#^view/[a-z0-9-]+/[^/]+(?:/task/[0-9]+)?$#', $route) === 1;
+
+if ($route === 'reporting/connect') {
+    $connectError = (string)($_SESSION['tm_connect_error'] ?? '');
+    $connectNotice = (string)($_SESSION['tm_connect_notice'] ?? '');
+    unset($_SESSION['tm_connect_error'], $_SESSION['tm_connect_notice']);
+    tm_render_connect_page($connectError, $connectNotice);
+    exit;
+}
+
+if ($route === 'reporting/connect/start') {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        send_bad_request('POST required.');
+    }
+    tm_connect_csrf_check();
+    try {
+        $startResult = tm_auth_start();
+        if (!empty($startResult['two_factor'])) {
+            tm_connect_set_pending(is_array($startResult['cookies'] ?? null) ? $startResult['cookies'] : []);
+            $_SESSION['tm_connect_notice'] = (string)($startResult['message'] ?? 'A login code was sent.');
+            header('Location: /reporting/connect', true, 303);
+            exit;
+        }
+        tm_connect_clear_pending();
+        $_SESSION['reporting_notice'] = ['type' => 'ok', 'text' => 'Task Manager connected. You can generate the report now.'];
+        header('Location: /reporting', true, 303);
+        exit;
+    } catch (Throwable $e) {
+        $_SESSION['tm_connect_error'] = $e->getMessage();
+        header('Location: /reporting/connect', true, 303);
+        exit;
+    }
+}
+
+if ($route === 'reporting/connect/verify') {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        send_bad_request('POST required.');
+    }
+    tm_connect_csrf_check();
+    if (tm_connect_rate_limited()) {
+        $_SESSION['tm_connect_error'] = 'Too many code attempts. Wait a few minutes and start again.';
+        header('Location: /reporting/connect', true, 303);
+        exit;
+    }
+    $pendingCookies = tm_connect_pending_cookies();
+    if (!$pendingCookies) {
+        $_SESSION['tm_connect_error'] = 'The login code expired. Start the connection again.';
+        header('Location: /reporting/connect', true, 303);
+        exit;
+    }
+    tm_connect_record_attempt();
+    try {
+        tm_auth_verify((string)($_POST['code'] ?? ''), $pendingCookies);
+        tm_connect_clear_pending();
+        $_SESSION['reporting_notice'] = ['type' => 'ok', 'text' => 'Task Manager connected. You can generate the report now.'];
+        header('Location: /reporting', true, 303);
+        exit;
+    } catch (Throwable $e) {
+        $_SESSION['tm_connect_error'] = $e->getMessage();
+        header('Location: /reporting/connect', true, 303);
+        exit;
+    }
+}
+
+if ($route === 'reporting/connect/resend') {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        send_bad_request('POST required.');
+    }
+    tm_connect_csrf_check();
+    try {
+        $restart = tm_auth_start();
+        if (!empty($restart['two_factor'])) {
+            tm_connect_set_pending(is_array($restart['cookies'] ?? null) ? $restart['cookies'] : []);
+            $_SESSION['tm_connect_notice'] = (string)($restart['message'] ?? 'A new code was sent.');
+        } else {
+            tm_connect_clear_pending();
+            $_SESSION['reporting_notice'] = ['type' => 'ok', 'text' => 'Task Manager connected. You can generate the report now.'];
+            header('Location: /reporting', true, 303);
+            exit;
+        }
+    } catch (Throwable $e) {
+        $_SESSION['tm_connect_error'] = $e->getMessage();
+    }
+    header('Location: /reporting/connect', true, 303);
+    exit;
+}
+
+if ($route === 'reporting/connect/cancel') {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        send_bad_request('POST required.');
+    }
+    tm_connect_csrf_check();
+    tm_connect_clear_pending();
+    header('Location: /reporting/connect', true, 303);
+    exit;
+}
 
 if (preg_match('#^reporting/download/(.+)$#', $route, $m)) {
     $fileName = basename((string)$m[1]);
@@ -1447,17 +1545,22 @@ if ($route === 'reporting/export') {
         send_bad_request('Reporting project is not configured.');
     }
 
-    if (!is_file($backupEnvFile)) {
-        send_bad_request('Asana env file not found at /opt/asana-backup/.env.');
-    }
-    if (!is_readable($backupEnvFile)) {
-        send_bad_request('Asana env file exists but is not readable by the web server user.');
-    }
-
-    $backupEnv = load_env_vars($backupEnvFile);
-    $asanaToken = trim((string)($backupEnv['ASANA_TOKEN'] ?? ''));
-    if ($asanaToken === '') {
-        send_bad_request('ASANA_TOKEN is missing in /opt/asana-backup/.env.');
+    try {
+        tm_validate_session();
+    } catch (TaskManagerAuthException $e) {
+        $_SESSION['reporting_notice'] = [
+            'type' => 'err',
+            'text' => $e->getMessage() . ' Open the reconnect page to sign in again.',
+        ];
+        header('Location: /reporting/connect', true, 303);
+        exit;
+    } catch (Throwable $e) {
+        $_SESSION['reporting_notice'] = [
+            'type' => 'err',
+            'text' => 'Task Manager is unavailable: ' . $e->getMessage(),
+        ];
+        header('Location: /reporting', true, 303);
+        exit;
     }
 
     $createdBy = trim((string)($_SESSION['auth_username'] ?? 'user'));
@@ -1542,8 +1645,7 @@ if ($route === 'reporting/export') {
             }
         });
 
-        $result = reporting_generate_export_file(
-            $asanaToken,
+        $result = reporting_generate_export_file_taskmanager(
             $reportingProjectGid,
             $reportingProjectName,
             $webRoot,
@@ -1566,7 +1668,9 @@ if ($route === 'reporting/export') {
             }
         });
     } catch (Throwable $e) {
-        $errorMessage = reporting_safe_error_message($e);
+        $errorMessage = $e instanceof TaskManagerAuthException
+            ? 'Task Manager session expired. Reconnect at /reporting/connect.'
+            : reporting_safe_error_message($e);
         reporting_with_lock($reportingExportLockFile, static function () use ($reportingExportJobsFile, $jobId, $errorMessage): void {
             $jobs = reporting_export_jobs_read($reportingExportJobsFile);
             $updated = reporting_export_job_update($jobs, $jobId, [
@@ -1772,6 +1876,38 @@ if (preg_match('#^reports/([A-Za-z0-9._-]+\.html)$#', $route, $m)) {
     exit;
 }
 
+if (preg_match('#^reports/([A-Za-z0-9._-]+\.pdf)$#', $route, $m)) {
+    $reportName = $m[1];
+    $reportPath = $reportsDir . '/' . $reportName;
+    if (basename($reportName) !== $reportName || !is_file($reportPath)) {
+        send_not_found();
+    }
+
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . $reportName . '"');
+    header('Content-Length: ' . (string)filesize($reportPath));
+    header('Cache-Control: private, no-store, max-age=0');
+    header('X-Content-Type-Options: nosniff');
+    readfile($reportPath);
+    exit;
+}
+
+if (preg_match('#^reports/([A-Za-z0-9._-]+\.docx)$#', $route, $m)) {
+    $reportName = $m[1];
+    $reportPath = $reportsDir . '/' . $reportName;
+    if (basename($reportName) !== $reportName || !is_file($reportPath)) {
+        send_not_found();
+    }
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    header('Content-Disposition: attachment; filename="' . $reportName . '"');
+    header('Content-Length: ' . (string)filesize($reportPath));
+    header('Cache-Control: private, no-store, max-age=0');
+    header('X-Content-Type-Options: nosniff');
+    readfile($reportPath);
+    exit;
+}
+
 if (str_starts_with($route, 'reports/')) {
     send_not_found();
 }
@@ -1910,6 +2046,7 @@ if (str_starts_with($route, 'reports/')) {
         <?php else: ?>
           <a class="btn" href="/reporting/export">Generate XLSX</a>
         <?php endif; ?>
+        <p class="muted" style="margin:.7rem 0 0;font-size:.9rem;">Task Manager session: <a href="/reporting/connect">reconnect</a></p>
         <h3 style="margin:1rem 0 0.55rem;">Generated Files</h3>
         <?php if (empty($reportingDownloads)): ?>
           <div class="muted">No generated reporting files yet.</div>

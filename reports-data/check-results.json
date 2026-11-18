@@ -1,96 +1,103 @@
 {
-  "generated_at": "2026-11-02T16:15:01+08:00",
-  "source": "pre-prod staging API and __NEXT_DATA__ labels",
+  "generated_at": "2026-11-16T11:12:11+08:00",
+  "source": "pre-prod staging API, __NEXT_DATA__ labels, Playwright and read-only CMS API",
+  "run_note": "Pre-prod checks and read-only CMS API checks were run. Email-template, export-permission, destructive-delete and CMS UI checks remain manual.",
   "results": {
     "1219729871681039": {
+      "result": "Pass",
+      "label": "Automated check",
+      "evidence": "The Home Upcoming Activities section uses “Upcoming Activities” and “近期活动”.",
+      "action": "Pass; Brandon to confirm on pre-prod and close."
+    },
+    "1219804537175138": {
+      "result": "Needs manual review",
+      "label": "CMS check",
+      "evidence": "CMS /dharma/courses returns only two CLOSED courses. Both pre-prod course URLs return a “Page not found” body. A published or open course is needed to verify the actual course page.",
+      "action": "Confirm the expected course state with the vendor, then retest the course page."
+    },
+    "1219575604730061": {
       "result": "Fail",
       "label": "Automated check",
-      "evidence": "The Home section label is “最新活动”; expected “近期活动”.",
-      "action": "Dexter to update the Home Upcoming Activities Chinese label and verify."
+      "evidence": "Download behaviour did not pass. /awaken-online/digital/-3 Download Audio: download=AWAKEN_DIGITAL_CONTENT_FILE-639276306571163574.mp3, size=0, failure=canceled, proxy_http=413 | /awaken-online/digital/-3 Download Video: download=AWAKEN_DIGITAL_CONTENT_FILE-639276306903001586.mp4, size=0, failure=canceled, proxy_http=413 | /zh/awaken-online/digital/-3 下载音频: download=AWAKEN_DIGITAL_CONTENT_FILE-639276306571163574.mp3, size=0, failure=canceled, proxy_http=413 | /zh/awaken-online/digital/-3 下载视频: download=AWAKEN_DIGITAL_CONTENT_FILE-639276306903001586.mp4, size=0, failure=canceled, proxy_http=413",
+      "action": "Vendor to fix the download behaviour and retest."
     },
-    "1219730157051326": {
-      "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "The Bright Youth top banner image requires a visual check.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    "1219584612769805": {
+      "result": "Fail",
+      "label": "Automated check",
+      "evidence": "Privacy notice check: /contact-us: notice=True, link=True | /zh/contact-us: notice=True, link=True. Old toast still present: True; expected EN copy present: False; expected CN copy present: False. The old toast still includes “shortly”.",
+      "action": "Vendor to replace the floating toast with the approved confirmation above the form and retest."
     },
-    "1219730041124358": {
+    "1219526058649071": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Both “btnApply” (CN 确定) and “btnCareerApply” (CN 申请) exist; confirm which button is rendered.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+      "label": "CMS check",
+      "evidence": "The public Location page loads 5/5 images in EN and CN. No CMS endpoint for the Dharma School Location title/description was found, so editability remains unverified.",
+      "action": "Verify the CMS Location fields when the correct CMS path is confirmed."
     },
-    "1219730152343193": {
-      "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Chinese text visibility on the Career page requires a visual/interaction check.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    "1219961154288257": {
+      "result": "Fail",
+      "label": "Automated check",
+      "evidence": "Register Now points to /activities/online-pledged/registration, which returns HTTP 200 with a page-not-found body. The count selection and preview cannot be verified.",
+      "action": "Vendor to restore the registration route, expose the 108/540/1080 options and preview, then retest."
     },
-    "1219729885998686": {
+    "1219961002989323": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Removal of the Career divider image requires a visual check.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+      "label": "CMS check",
+      "evidence": "CMS contact/helpdesk phone fields are stored as plain strings. The pre-prod 3 Refuge page has no phone input, so 6-prefix and multiple-line behaviour cannot be tested there.",
+      "action": "Confirm where the phone field is rendered and test 6-prefix and multiple numbers."
     },
-    "1219730214723788": {
+    "1219961049118002": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Banner text is Careers / 招聘; the updated banner image requires a visual check.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+      "label": "CMS check",
+      "evidence": "The CMS activity details load and the Online Pledge page content contains long HTML and a base64 image. The API does not expose the Text + Image or Text Area field limits. The public pre-prod page still does not show the How-to-submit or prayer content.",
+      "action": "Check the CMS field limits and confirm the full EN/CN content displays on pre-prod."
     },
-    "1219730214602139": {
+    "1219573938599764": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "API pageBreakImage is null; confirm visually that the redundant divider is gone.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+      "label": "CMS check",
+      "evidence": "CMS /mails/report returns HTTP 403 Insufficient permissions for this account, so the export fields could not be inspected.",
+      "action": "Use a permitted CMS account or export manually and confirm the subscription date/time fields."
     },
-    "1219730157523754": {
+    "1220457628953032": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Gallery and Upcoming Activities order requires a visual check.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+      "label": "CMS check",
+      "evidence": "CMS /offerings returns HTTP 200 with 6 offerings and stockLeft/stockTotal values. No server error was returned. The CMS Stock column click still needs a visual confirmation.",
+      "action": "Open CMS Offering Listing, click Stock, confirm there is no page error, then close."
     },
-    "1219729884657529": {
+    "1219566240500919": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "The new intro copy is live, but the intro button still reads “Join Now” / “立即加入” instead of “Volunteer” / “护法义工”; the label is not controlled by the CMS.",
-      "action": "Assign an owner to change the intro button label; it is not controlled by the CMS."
+      "label": "CMS check",
+      "evidence": "CMS /logs returns audit entries with email, action, module, object name, actionBy and timestamp. No cancellation-reason field appears in the list API.",
+      "action": "Open a cancelled activity in Master Audit Trail and confirm the reason is visible before closing."
     },
-    "1219730156544417": {
+    "1220102510328267": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Banner title/subtitle and image require a visual check.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+      "label": "CMS check",
+      "evidence": "CMS /admin/email-config does not expose email templates. The Chinese acknowledgement template could not be inspected.",
+      "action": "Check a Chinese pre-prod acknowledgement email and confirm the approved copy."
     },
-    "1219566240500914": {
+    "1220102256145249": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Deleting the test records requires a manual CMS test.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+      "label": "CMS check",
+      "evidence": "CMS /admin/email-config returns routing email lists only. The sender display name is not exposed by this API.",
+      "action": "Check a pre-prod acknowledgement email and confirm the sender shows KMSPKS."
     },
-    "1219477239250114": {
+    "1220102726401766": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "CMS UI check required; the edit icon is not testable from the pre-prod front end.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+      "label": "CMS check",
+      "evidence": "CMS /admin/email-config returns routing email lists only. The subject prefix is not exposed by this API.",
+      "action": "Check a pre-prod acknowledgement email subject and confirm the internal prefix is removed."
     },
-    "1219575656937178": {
-      "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Audio player and YouTube-link playback require a manual check on a digital post.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+    "1219636982479482": {
+      "result": "Pass",
+      "label": "CMS check",
+      "evidence": "CMS /dharma/courses returns two courses, both CLOSED. The test course “Testing course with several level and schedules” is no longer present.",
+      "action": "Pass; verify in CMS and close. The vendor confirmed OPEN/CLOSED courses remain protected from deletion."
     },
-    "1219575486874259": {
+    "1220374393195121": {
       "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Multiple-track upload and playback require a manual CMS check.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
-    },
-    "1219584776062295": {
-      "result": "Needs manual review",
-      "label": "Needs manual review",
-      "evidence": "Submission-failure handling requires a controlled manual test; do not submit the live form.",
-      "action": "Brandon to check manually; update Dexter only if a defect is found."
+      "label": "CMS check",
+      "evidence": "The new ticket has no comments. CMS contact/helpdesk phone fields are plain strings and no validation metadata is exposed. The target field is not yet confirmed.",
+      "action": "Confirm the exact Contact Information field and test 6/3-prefix and multiple numbers."
     }
   }
 }

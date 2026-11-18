@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reply preparation — Revee / Codigo</title>
+<meta name="report-title" content="Reply preparation — Revee / Codigo">
+<meta name="report-date" content="2026-11-13T09:36:00+08:00">
+<meta name="report-summary" content="Brandon's alignment for the reply to Revee: Marcomm determines the launch date, agreed-scope tickets remain with Codigo, E2E stays defect-focused, AWS WAF questions and the data migration discussion.">
+<style>
+:root{--bg:#f7f4ee;--panel:#fffdf8;--ink:#1f1a12;--muted:#6d5f4e;--line:#ddd2bf;--accent:#7d2b1f;--accent2:#652116;--pass:#24522a;--passbg:#f0f7ee;--fail:#8c261a;--failbg:#fff0ee;--review:#6a4319;--reviewbg:#fff6e8;--info:#1f4f6a;--infobg:#edf6fb;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.55}
+.page{max-width:1120px;margin:0 auto;padding:1.25rem 1.25rem 2rem}
+.top{display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--line);padding-bottom:.75rem;margin-bottom:.9rem;flex-wrap:wrap}
+.brand{font-size:1.05rem;letter-spacing:.02em}
+.back{color:var(--accent);text-decoration:none;font-size:.95rem}
+.back:hover{text-decoration:underline}
+.meta{color:var(--muted);font-size:.9rem;margin:0 0 1.2rem}
+.content h1{font-size:1.65rem;line-height:1.25;margin:0 0 .7rem}
+.content h2{font-size:1.2rem;margin:1.7rem 0 .55rem;border-bottom:1px solid var(--line);padding-bottom:.28rem}
+.content h3{font-size:1.02rem;margin:1.2rem 0 .4rem}
+.content p{margin:.55rem 0}
+.content a{color:var(--accent);overflow-wrap:anywhere}
+.content strong{font-weight:700}
+.content code{background:#f0e6d7;border-radius:4px;padding:.1rem .25rem;font-size:.9em}
+.muted{color:var(--muted);font-size:.82rem;font-family:Arial,Helvetica,sans-serif}
+.content ul,.content ol{margin:.45rem 0 .75rem 1.35rem;padding:0}
+.content li{margin:.25rem 0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin:.8rem 0 1rem}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.75rem .85rem}
+.card .num{font-size:1.6rem;line-height:1.1;color:var(--accent)}
+.card .label{font-family:Arial,Helvetica,sans-serif;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.note{background:var(--infobg);border:1px solid #b9d8e6;border-left:5px solid var(--info);border-radius:6px;padding:.7rem .85rem;margin:.8rem 0}
+.warn{background:var(--reviewbg);border:1px solid #e1c89f;border-left:5px solid var(--review);border-radius:6px;padding:.7rem .85rem;margin:.8rem 0}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin:.8rem 0 1rem;background:var(--panel)}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{border-bottom:1px solid #eee2cf;padding:.55rem .6rem;text-align:left;vertical-align:top}
+th{background:#f0e4d2;font-family:Arial,Helvetica,sans-serif;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-block;border-radius:999px;padding:.12rem .48rem;font-family:Arial,Helvetica,sans-serif;font-size:.75rem;font-weight:700;white-space:nowrap}
+.badge.confirm{background:var(--passbg);color:var(--pass);border:1px solid #bdd9b8}
+.badge.verify{background:var(--infobg);color:var(--info);border:1px solid #b9d8e6}
+.badge.defer{background:#f3eee6;color:var(--muted);border:1px solid #d8cbb8}
+.badge.ask{background:var(--reviewbg);color:var(--review);border:1px solid #e1c89f}
+.badge.fail{background:var(--failbg);color:var(--fail);border:1px solid #e2b8b0}
+.email{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1rem;margin:.8rem 0 1rem}
+.email pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:Georgia,"Times New Roman",serif;font-size:.95rem;line-height:1.55;margin:0}
+.copy-row{display:flex;justify-content:flex-end;gap:.5rem;margin-bottom:.6rem}
+.btn{display:inline-block;border:1px solid #d8c9b2;background:#fff;color:#5c3a1f;border-radius:6px;padding:.3rem .6rem;font-family:Arial,Helvetica,sans-serif;font-size:.8rem;text-decoration:none;cursor:pointer}
+.btn:hover{background:#f9f2e6;text-decoration:none}
+footer{margin-top:2rem;border-top:1px solid var(--line);padding-top:.8rem;color:var(--muted);font-size:.85rem}
+@media print{body{background:#fff}.top,.back,footer,.btn,.copy-row{display:none}.page{max-width:none;padding:0}.table-wrap{overflow:visible;border:0}th{background:#eee}tr{break-inside:avoid}a{color:inherit;text-decoration:none}.email{border:0;padding:0}}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+<div class="brand">KMSPKS UAT Reports</div>
+<a class="back" href="/reports">&larr; All reports</a>
+</header>
+<div class="meta">Revised 13 Nov 2026, 9:36 AM SGT · Report reference: reply-revee</div>
+<article class="content">
+<h1>Reply preparation — Revee / Codigo</h1>
+<p>This is the internal preparation page for the KMS UAT launch email. It sets out Brandon's alignment on the target launch date, the overall handling of Asana tickets, and the two outstanding items: AWS WAF and data migration. The draft reply below follows that position. No Asana comments or status changes were made in preparing this page.</p>
+
+<div class="cards">
+<div class="card"><div class="num">3</div><div class="label">Alignment areas</div></div>
+<div class="card"><div class="num">30</div><div class="label">Active non-CR tickets</div></div>
+<div class="card"><div class="num">17</div><div class="label">CR / internal review</div></div>
+<div class="card"><div class="num">5</div><div class="label">Client to verify</div></div>
+</div>
+
+<div class="note"><strong>Position:</strong> Marcomm determines the launch date after internal alignment and readiness. Agreed-scope items remain with Codigo; Marcomm and the respective users prioritise business requirements; Codigo advises on feasibility, timelines and CR implications. E2E remains focused on defects against agreed requirements, not new enhancements.</div>
+
+<h2>1. Alignment position</h2>
+
+<h3>Target launch date</h3>
+<p>The target launch date will be determined by Marcomm following internal alignment and once the necessary requirements and readiness criteria have been addressed.</p>
+<p>Ivan and Brandon will continue supporting technical readiness, coordinating with Codigo and tracking outstanding issues that may affect the launch.</p>
+
+<h3>Overall Asana ticket handling</h3>
+<ul>
+<li>Items within the agreed project scope should remain with Codigo for review and resolution.</li>
+<li>Marcomm and the respective users should review and prioritise business requirements.</li>
+<li>Codigo should advise on technical feasibility, estimated timelines and any potential CR implications.</li>
+<li>For E2E, the focus should remain on identifying and resolving defects against the agreed requirements, rather than introducing new enhancements.</li>
+</ul>
+
+<h3>AWS WAF</h3>
+<p>Codigo should provide further clarification on the following:</p>
+<ul>
+<li>What alternative solutions are available to Cloudflare Turnstile or Google reCAPTCHA for bot protection?</li>
+<li>What is the proposed WAF rule scope and coverage?</li>
+<li>Is the implementation included in the existing project scope, or would it incur additional charges?</li>
+<li>What is the potential impact on OTP API latency and false-positive rates?</li>
+<li>What are the proposed rollback arrangements and ongoing monitoring responsibilities?</li>
+</ul>
+<p>IT will review the technical considerations once the information is available.</p>
+
+<h3>Data migration</h3>
+<p>We would like to arrange a discussion to review the proposed mobile number classification, going through the respective groups individually.</p>
+<p>Based on the current migration process, records that were successfully imported are accounted for. However, the failed records still require further assessment and a proposed solution from Codigo.</p>
+<p>In particular, we need to understand how users can retrieve or enquire about their past activity records associated with the failed migration records. Codigo should share the latest migration breakdown and proposed approach ahead of the discussion. Any final migration decisions will require alignment with the relevant business stakeholders.</p>
+
+<h2>2. Draft email to Revee</h2>
+<div class="email">
+<div class="copy-row"><button class="btn" type="button" onclick="copyEmail()">Copy email</button></div>
+<pre id="emailBody">Hi Revee,
+
+Thanks for the note. I have reviewed the board and set out our position below.
+
+Target launch date
+
+The target launch date will be determined by Marcomm following internal alignment and once the necessary requirements and readiness criteria have been addressed. Ivan and I will continue to support the technical readiness, coordinate with Codigo and track outstanding issues that may affect the launch.
+
+Overall Asana ticket handling
+
+For the outstanding Asana tickets, we will maintain the following approach:
+
+- Items within the agreed project scope will remain with Codigo for review and resolution.
+- Marcomm and the respective users will review and prioritise business requirements.
+- Codigo will advise on technical feasibility, estimated timelines and any potential CR implications.
+- For E2E, the focus will remain on identifying and resolving defects against the agreed requirements, rather than introducing new enhancements.
+
+AWS WAF
+
+Could you provide further clarification on the following:
+
+- What alternative solutions are available to Cloudflare Turnstile or Google reCAPTCHA for bot protection?
+- What is the proposed WAF rule scope and coverage?
+- Is the implementation included in the existing project scope, or would it incur additional charges?
+- What is the potential impact on OTP API latency and false-positive rates?
+- What are the proposed rollback arrangements and ongoing monitoring responsibilities?
+
+IT will review the technical considerations once the information is available.
+
+Data migration
+
+We would like to arrange a discussion to review the proposed mobile number classification, going through the respective groups individually. Based on the current migration process, records that were successfully imported are accounted for. However, the failed records still require further assessment and a proposed solution from Codigo.
+
+In particular, we need to understand how users can retrieve or enquire about their past activity records associated with the failed migration records. Please share the latest migration breakdown and your proposed approach ahead of the discussion. Any final migration decisions will require alignment with the relevant business stakeholders.
+
+We will continue to track the outstanding tickets in Asana.
+
+Thanks,
+Brandon</pre>
+</div>
+
+<h2>3. Current board snapshot</h2>
+<p>Counts below are named tasks in the active sections as at 13 November 2026. Blank placeholder tasks are excluded.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Section</th><th>Active</th><th>Owner / next step</th></tr></thead>
+<tbody>
+<tr><td>To discuss/confirm</td><td>5</td><td>Brandon to confirm with Marcomm, users and IT; Codigo to implement once confirmed.</td></tr>
+<tr><td>New Request on Pre-prod</td><td>8</td><td>Marcomm and the respective users to prioritise business requirements; Codigo to advise feasibility, timelines and CR implications.</td></tr>
+<tr><td>To update hardcoded content</td><td>2</td><td>Brandon to supply content; Codigo to update.</td></tr>
+<tr><td>Fix In Progress</td><td>5</td><td>Codigo resolving.</td></tr>
+<tr><td>Fail (To fix again)</td><td>1</td><td>Codigo re-fixing the Download Video/Audio button.</td></tr>
+<tr><td>QA to verify</td><td>4</td><td>KMS QA to verify.</td></tr>
+<tr><td>Client to verify</td><td>5</td><td>Brandon (3) and Dexter (2) to verify and close.</td></tr>
+<tr><td>To verify again (KMS internal use - CR)</td><td>17</td><td>KMS internal review; CR items are not part of the agreed delivery.</td></tr>
+</tbody></table></div>
+<p class="muted">Active non-CR tickets: 30. CR/internal review: 17. The draft email does not quote these counts.</p>
+
+<h2>4. Follow-up actions</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Area</th><th>Action</th><th>Owner</th></tr></thead>
+<tbody>
+<tr><td>Target launch date</td><td>Set the date after internal alignment and readiness; track technical readiness and outstanding launch issues.</td><td>Marcomm; Ivan; Brandon</td></tr>
+<tr><td>Agreed-scope tickets</td><td>Keep with Codigo for review and resolution; route business priority through Marcomm and the respective users; obtain feasibility, timelines and CR implications from Codigo.</td><td>Codigo; Marcomm; users</td></tr>
+<tr><td>E2E</td><td>Identify and resolve defects against agreed requirements; do not introduce new enhancements.</td><td>Codigo; KMS</td></tr>
+<tr><td>AWS WAF</td><td>Send the five questions; IT reviews the technical considerations once Codigo responds.</td><td>Brandon; IT; Codigo</td></tr>
+<tr><td>Data migration</td><td>Schedule the group-by-group discussion; obtain the latest breakdown and proposed approach; align final decisions with business stakeholders.</td><td>Brandon; Ivan; Codigo; business stakeholders</td></tr>
+</tbody></table></div>
+
+<h2>5. Before you send</h2>
+<ul>
+<li>Confirm Marcomm's internal alignment and readiness criteria.</li>
+<li>Confirm IT can review the WAF information once Codigo responds.</li>
+<li>Confirm the relevant business stakeholders for the migration groups.</li>
+<li>Check the current board counts if you intend to quote them; the draft email does not.</li>
+<li>Keep the WAF cost question under “additional charges”; no separate monthly cost question is included.</li>
+</ul>
+
+<h2>Closing note</h2>
+<p>This page is a preparation aid for the reply. No Asana comments, status changes, assignee changes or due-date changes were made in preparing this page.</p>
+</article>
+<footer>KMSPKS UAT reporting portal. This page is available only to signed-in users.</footer>
+</div>
+<script>
+function copyEmail() {
+  var text = document.getElementById('emailBody').innerText;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(function () {
+      var btn = document.querySelector('.copy-row .btn');
+      if (btn) { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy email'; }, 1600); }
+    });
+    return;
+  }
+  var area = document.createElement('textarea');
+  area.value = text;
+  document.body.appendChild(area);
+  area.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(area);
+  var btn = document.querySelector('.copy-row .btn');
+  if (btn) { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy email'; }, 1600); }
+}
+</script>
+</body>
+</html>

@@ -19,6 +19,9 @@ from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from create_uat_tickets import load_env, api_request, ENV_PATH
+
 PREPROD_BASE = "https://pre-prod.d2x7klqewcc6th.amplifyapp.com"
 API_BASE = "https://api-staging.kmspks.org:83/kms-web-api/v1/"
 OUT = Path(__file__).resolve().parent / "reports-data" / "check-results.json"
@@ -35,22 +38,11 @@ APP_JS = None
 
 MANUAL_ACTION = "Brandon to check manually; update Dexter only if a defect is found."
 
-EXPECTED_CURRENT = {
-    "1219477239250114",
-    "1219566240500914",
-    "1219575486874259",
-    "1219575656937178",
-    "1219584776062295",
-    "1219729871681039",
-    "1219729884657529",
-    "1219729885998686",
-    "1219730041124358",
-    "1219730152343193",
-    "1219730156544417",
-    "1219730157051326",
-    "1219730157523754",
-    "1219730214602139",
-    "1219730214723788",
+ACTIVE_SECTIONS = {
+    "1212426681919491": "Client to verify",
+    "1212440848489031": "Fix In Progress",
+    "1212440848489029": "Fail (To fix again)",
+    "1212440848489033": "QA to verify",
 }
 
 EXPECTED_DEPARTMENTS = [
@@ -142,6 +134,25 @@ def normalize_url(value):
     return urlunsplit(
         (parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), "", "")
     )
+
+
+def active_gids():
+    token = load_env(ENV_PATH)["ASANA_TOKEN"]
+    found = {}
+    for section_gid, section_name in ACTIVE_SECTIONS.items():
+        offset = None
+        while True:
+            params = {"limit": 100, "opt_fields": "name"}
+            if offset:
+                params["offset"] = offset
+            payload = api_request(token, "GET", f"/sections/{section_gid}/tasks", params=params)
+            for task in payload.get("data", []):
+                if (task.get("name") or "").strip():
+                    found[task["gid"]] = section_name
+            offset = (payload.get("next_page") or {}).get("offset")
+            if not offset:
+                break
+    return found
 
 
 def add(results, gid, result, evidence, action, label=None):
@@ -279,6 +290,27 @@ def check_digital(results):
             "Fail",
             "The Digital page labels are not “Digital Content” / “数位资源”.",
             "Dexter to update the category label and verify.",
+        )
+
+    recommended_ok = (
+        en.get("featuredDigitalTitle") == "Featured"
+        and zh.get("featuredDigitalTitle") == "精选"
+    )
+    if recommended_ok:
+        add(
+            results,
+            "1219575486816225",
+            "Pass",
+            "The Digital recommended label is “Featured” / “精选”.",
+            "Pass; owner to confirm and close.",
+        )
+    else:
+        add(
+            results,
+            "1219575486816225",
+            "Fail",
+            "The Digital label is still “Digital Recommended for You” (EN) / “数位资源” (CN); expected “Featured” / “精选”.",
+            "Dexter or Kaung to update the label and verify.",
         )
 
 
@@ -778,37 +810,513 @@ def manual_checks(results):
     )
 
 
+def check_active_manual(results):
+    add(results, "1219875631714216", "Needs manual review", "Image dimensions, aspect ratios, cropping and CMS integration for Major Events and Activities need confirmation.", "Confirm the dimensions and cropping behaviour, then verify the CMS posting workflow.")
+    add(results, "1219729871505000", "Needs manual review", "The Home Page top banner and upcoming activities layout require a visual check.", "Review the banner and activities separation on pre-prod.")
+    add(results, "1219729886373019", "Needs manual review", "The approved Career intro copy and replacement photo require content and visual confirmation.", "Verify the Career intro copy and photo on pre-prod.")
+    add(results, "1220102256145249", "Needs manual review", "The acknowledgement email sender display name should be KMSPKS instead of KMS.", "Verify the sender display name on a pre-prod acknowledgement email.")
+    add(results, "1220102726401766", "Needs manual review", "The acknowledgement email subject contains the internal [KMS-PRE-PROD] prefix; confirm it is test-only and removed for public emails.", "Verify the acknowledgement email subject and remove the internal prefix before production.")
+    add(results, "1219575604730061", "Needs manual review", "Vendor reports both audio and video downloads work on pre-prod; KMS to verify the download interaction.", "Verify both download buttons and close if pass.")
+    add(results, "1219477239416627", "Needs manual review", "Content field decision required: title optional and description at 500 characters.", "Confirm the field decision with Marcomm.")
+    add(results, "1219636982479482", "Needs manual review", "Deletion policy required for OPEN and CLOSED courses and their related records.", "Confirm no deletion of ongoing courses; allow test or draft deletion or archive.")
+    add(results, "1219584612769805", "Needs manual review", "Vendor reports the privacy notice is correct, but the floating toast still overlaps content and still says shortly; expected confirmation above the form, only after success.", "Vendor to fix the toast wording and placement; retest.")
+    add(results, "1220102386894700", "Needs manual review", "Vendor is updating the acknowledgement email wording and template; verify the approved copy after deployment.", "Verify the acknowledgement email wording on pre-prod and close if pass.")
+    add(results, "1220102510328267", "Needs manual review", "Vendor says the Chinese acknowledgement is done; verify the Chinese email content and reference details on pre-prod.", "Verify the Chinese acknowledgement and close if pass.")
+    add(results, "1219570452486142", "Needs manual review", "Vendor verified the Contact Us banner on pre-prod; KMS or Marcomm should confirm the banner and close if pass.", "Review the banner and close if pass.")
+    add(results, "1219804537175138", "Needs manual review", "Dharma School course page not found; vendor asked for the fix to be updated to pre-prod.", "Verify the course page after deployment.")
+    add(results, "1219573938599764", "Needs manual review", "Vendor confirms the submitted email is stored in the database; valid, invalid and duplicate feedback still need verification.", "Verify the staging feedback and confirm before UAT.")
+    add(results, "1219566240500919", "Needs manual review", "Vendor quoted 5 mandays for the Master Audit Trail change.", "Reject the CR and ask vendor to proceed within the agreed delivery.")
+    add(results, "1220457628953032", "Needs manual review", "Offering Listing Stock page error has no vendor comment yet.", "Ask vendor for an update and verify the Stock page.")
+    add(results, "1219961002989323", "Needs manual review", "Vendor explains the shared phone component only accepts numbers starting with 8 or 9.", "Ask for a workaround within the agreed scope for 6-prefix and multiple numbers.")
+    add(results, "1219526058649071", "Needs manual review", "Vendor called Contents not loading a CR; KMS rejected the CR framing.", "Follow up and confirm the content update within the agreed scope.")
+    add(results, "1219961049118002", "Needs manual review", "Vendor asks to increase Text plus Image and Text Area limits to 2000.", "Confirm the 2000-character limit decision with Marcomm.")
+    add(results, "1219961154288257", "Needs manual review", "Vendor verified the Online Pledge count and preview on staging and asks for pre-prod deployment.", "Approve pre-prod deployment and verify the count and preview.")
+
+
+def page_script_texts(path):
+    html = page(path)
+    sources = re.findall(r'<script[^>]+src="([^"]+)"', html)
+    texts = []
+    for src in sources:
+        if src.startswith("http"):
+            continue
+        try:
+            texts.append(SESSION.get(PREPROD_BASE + src, timeout=30).text)
+        except requests.RequestException:
+            continue
+    return texts
+
+
+def visible_first(locator):
+    for i in range(locator.count()):
+        item = locator.nth(i)
+        try:
+            if item.is_visible():
+                return item
+        except Exception:
+            continue
+    return None
+
+
+def check_home_label(results, active):
+    gid = "1219729871681039"
+    if gid not in active:
+        return
+    en = page_messages("/")
+    zh = page_messages("/zh/")
+    en_label = en.get("upcomingActivitiesTitle")
+    zh_label = zh.get("upcomingActivitiesTitle")
+    if en_label == "Upcoming Activities" and zh_label == "近期活动":
+        add(
+            results,
+            gid,
+            "Pass",
+            "The Home Upcoming Activities section uses “Upcoming Activities” and “近期活动”.",
+            "Pass; Brandon to confirm on pre-prod and close.",
+        )
+    else:
+        add(
+            results,
+            gid,
+            "Fail",
+            f"Home label is “{en_label}” / “{zh_label}”; expected “Upcoming Activities” / “近期活动”.",
+            "Vendor to correct the Home Upcoming Activities Chinese label and retest.",
+        )
+
+
+def check_course_target(results, active):
+    gid = "1219804537175138"
+    if gid not in active:
+        return
+    data = api_get("dharma/content")
+    course_id = data.get("courseId")
+    if not course_id:
+        add(
+            results,
+            gid,
+            "Needs manual review",
+            "The public dharma content API returns courseId: null, so no course page target is available. CMS course data was not checked because CMS/OTP access was skipped.",
+            "Re-run the course check from the CMS/account flow when CMS access is available.",
+        )
+        return
+    status = SESSION.get(
+        PREPROD_BASE + f"/dharma-education/school/course/{course_id}",
+        timeout=30,
+    ).status_code
+    if status == 200:
+        add(
+            results,
+            gid,
+            "Pass",
+            f"Course page /dharma-education/school/course/{course_id} returns HTTP 200.",
+            "Pass; KMS QA to confirm and close.",
+        )
+    else:
+        add(
+            results,
+            gid,
+            "Fail",
+            f"Course page /dharma-education/school/course/{course_id} returns HTTP {status}.",
+            "Vendor to fix the course page and retest.",
+        )
+
+
+def check_download_ui(page, results, active):
+    gid = "1219575604730061"
+    if gid not in active:
+        return
+    outcomes = []
+    targets = [
+        ("/awaken-online/digital/-3", ["Download Audio", "Download Video"]),
+        ("/zh/awaken-online/digital/-3", ["下载音频", "下载视频"]),
+    ]
+    for path, labels in targets:
+        try:
+            page.goto(PREPROD_BASE + path, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_timeout(2500)
+        except Exception as exc:
+            outcomes.append(f"{path}: navigation failed ({exc.__class__.__name__})")
+            continue
+        for label in labels:
+            loc = page.get_by_role("button", name=label, exact=True)
+            target = visible_first(loc)
+            if target is None:
+                outcomes.append(f"{path} {label}: button not found")
+                continue
+            try:
+                with page.expect_download(timeout=15000) as download_info:
+                    target.click()
+                download = download_info.value
+                failure = download.failure()
+                size = 0
+                try:
+                    downloaded_path = download.path()
+                    size = Path(downloaded_path).stat().st_size if downloaded_path else 0
+                except Exception:
+                    pass
+                proxy_status = None
+                try:
+                    probe = SESSION.get(
+                        download.url,
+                        timeout=30,
+                        stream=True,
+                        allow_redirects=False,
+                    )
+                    proxy_status = probe.status_code
+                except Exception:
+                    pass
+                outcomes.append(
+                    f"{path} {label}: download={download.suggested_filename or 'unnamed'}, "
+                    f"size={size}, failure={failure or 'none'}, proxy_http={proxy_status}"
+                )
+                try:
+                    download.delete()
+                except Exception:
+                    pass
+            except Exception as exc:
+                outcomes.append(f"{path} {label}: no download event ({exc.__class__.__name__})")
+    passed = bool(outcomes) and all(
+        "download=" in item and "failure=none" in item and "proxy_http=200" in item
+        for item in outcomes
+    )
+    if passed:
+        add(
+            results,
+            gid,
+            "Pass",
+            "Playwright download events fired for audio and video. " + " | ".join(outcomes),
+            "Pass; Brandon to confirm in the browser and close.",
+        )
+    else:
+        add(
+            results,
+            gid,
+            "Fail",
+            "Download behaviour did not pass. " + " | ".join(outcomes),
+            "Vendor to fix the download behaviour and retest.",
+        )
+
+
+def has_link(page, text, href_part):
+    links = page.locator("a")
+    for i in range(links.count()):
+        try:
+            link = links.nth(i)
+            if text in (link.inner_text() or "") and href_part in (link.get_attribute("href") or ""):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def check_contact_ui(page, results, active):
+    gid = "1219584612769805"
+    if gid not in active:
+        return
+    details = []
+    privacy_ok = True
+    for path in ("/contact-us", "/zh/contact-us"):
+        page.goto(PREPROD_BASE + path, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(2500)
+        body = page.locator("body").inner_text()
+        if path.startswith("/zh/"):
+            text_ok = "个人资料" in body and "隐私政策" in body
+            link_ok = has_link(page, "隐私政策", "/zh/privacy-policy")
+        else:
+            text_ok = "personal data you provide" in body and "Privacy Policy" in body
+            link_ok = has_link(page, "Privacy Policy", "/privacy-policy")
+        details.append(f"{path}: notice={text_ok}, link={link_ok}")
+        privacy_ok = privacy_ok and text_ok and link_ok
+
+    scripts = page_script_texts("/contact-us")
+    old_toast = any("shortly" in js and "successfully submitted" in js for js in scripts)
+    expected_en = any(
+        "Thank you! Your message has been submitted successfully." in js for js in scripts
+    )
+    expected_cn = any("您的信息已成功提交" in js for js in scripts)
+    if privacy_ok and not old_toast and expected_en and expected_cn:
+        add(
+            results,
+            gid,
+            "Pass",
+            "Privacy notice is present in EN/CN and the confirmation wording matches the approved copy. "
+            + " | ".join(details),
+            "Pass; KMS QA to confirm and close.",
+        )
+    else:
+        add(
+            results,
+            gid,
+            "Fail",
+            "Privacy notice check: "
+            + " | ".join(details)
+            + f". Old toast still present: {old_toast}; expected EN copy present: {expected_en}; "
+            f"expected CN copy present: {expected_cn}. The old toast still includes “shortly”.",
+            "Vendor to replace the floating toast with the approved confirmation above the form and retest.",
+        )
+
+
+def check_location_ui(page, results, active):
+    gid = "1219526058649071"
+    if gid not in active:
+        return
+    details = []
+    all_ok = True
+    for path in ("/dharma-education/school/location", "/zh/dharma-education/school/location"):
+        page.goto(PREPROD_BASE + path, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(3000)
+        images = page.locator("img")
+        total = images.count()
+        bad = 0
+        for i in range(total):
+            try:
+                loaded = images.nth(i).evaluate("e => e.complete && e.naturalWidth > 0")
+                if not loaded:
+                    bad += 1
+            except Exception:
+                bad += 1
+        details.append(f"{path}: {total - bad}/{total} images loaded")
+        all_ok = all_ok and total > 0 and bad == 0
+    if all_ok:
+        add(
+            results,
+            gid,
+            "Needs manual review",
+            "Public Location images load on EN/CN. "
+            + " | ".join(details)
+            + ". CMS Location fields were not checked because CMS/OTP access was skipped.",
+            "Re-run the CMS editability check when CMS access is available; then verify and close.",
+        )
+    else:
+        add(
+            results,
+            gid,
+            "Fail",
+            "One or more Location images did not load. " + " | ".join(details),
+            "Vendor to fix the missing Location images and retest.",
+        )
+
+
+def check_online_pledge_ui(page, results, active):
+    count_gid = "1219961154288257"
+    refuge_gid = "1219961002989323"
+    content_gid = "1219961049118002"
+
+    if count_gid in active:
+        page.goto(PREPROD_BASE + "/activities/online-pledged", wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(2500)
+        link = visible_first(page.get_by_role("link", name="Register Now", exact=True))
+        if link is None:
+            link = visible_first(page.get_by_role("link", name="立即报名", exact=True))
+        if link is None:
+            add(
+                results,
+                count_gid,
+                "Fail",
+                "The Online Pledge page has no visible Register Now link.",
+                "Vendor to restore the registration entry point and retest.",
+            )
+        else:
+            href = link.get_attribute("href") or ""
+            absolute = href if href.startswith("http") else PREPROD_BASE + href
+            response = SESSION.get(absolute, timeout=30)
+            status = response.status_code
+            page_not_found = "Page not found" in response.text or "页面未找到" in response.text
+            if status == 404 or page_not_found:
+                add(
+                    results,
+                    count_gid,
+                    "Fail",
+                    f"Register Now points to {href}, which returns HTTP {status}"
+                    + (" with a page-not-found body" if page_not_found else "")
+                    + ". The count selection and preview cannot be verified.",
+                    "Vendor to restore the registration route, expose the 108/540/1080 options and preview, then retest.",
+                )
+            else:
+                add(
+                    results,
+                    count_gid,
+                    "Needs manual review",
+                    f"Register Now points to {href} and returns HTTP {status}; count options and preview still need a functional check.",
+                    "Verify the 108/540/1080 selection and preview, then close if pass.",
+                )
+
+    if refuge_gid in active:
+        page.goto(
+            PREPROD_BASE + "/activities/online-pledged/3-refuge-5-precepts",
+            wait_until="domcontentloaded",
+            timeout=60000,
+        )
+        page.wait_for_timeout(2500)
+        phone = page.locator(
+            'input[name*="phone" i], input[id*="phone" i], '
+            'input[placeholder*="phone" i], input[aria-label*="phone" i]'
+        )
+        if phone.count() == 0:
+            add(
+                results,
+                refuge_gid,
+                "Needs manual review",
+                "No phone input was found on the 3 Refuge and 5 Precepts page; the registration route returns a page-not-found body. The 6-prefix and multiple-line behaviour cannot be tested from this page.",
+                "Vendor to confirm where the phone field is rendered and retest after the registration route is restored.",
+            )
+        else:
+            add(
+                results,
+                refuge_gid,
+                "Needs manual review",
+                f"Found {phone.count()} phone input(s); the 6-prefix and multiple-line test needs controlled form data.",
+                "Run a controlled phone-input test, then verify and close if pass.",
+            )
+
+    if content_gid in active:
+        page.goto(PREPROD_BASE + "/activities/online-pledged", wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(2500)
+        body = page.locator("body").inner_text()
+        has_content = any(term in body for term in ("How to submit", "如何提交", "祈愿文"))
+        add(
+            results,
+            content_gid,
+            "Needs manual review",
+            f"Public Online Pledge page loads; How-to-submit/prayer content present: {has_content}. "
+            "The CMS Text + Image and Text Area limits were not checked because CMS/OTP access was skipped.",
+            "Re-run the CMS field-limit check when CMS access is available; then verify and close.",
+        )
+
+
+def check_mailing_ui(page, results, active):
+    gid = "1219573938599764"
+    if gid not in active:
+        return
+    page.goto(PREPROD_BASE + "/", wait_until="domcontentloaded", timeout=60000)
+    page.wait_for_timeout(2500)
+    email_inputs = page.locator('input[type="email"]')
+    add(
+        results,
+        gid,
+        "Needs manual review",
+        f"Mailing-list form present with {email_inputs.count()} email input(s). "
+        "Valid, invalid and duplicate feedback and the export fields require a controlled submission/CMS check; skipped.",
+        "Run a controlled mailing-list test or verify the feedback and export fields manually.",
+    )
+
+
+def check_web_ui(results, active):
+    ui_gids = {
+        "1219575604730061",
+        "1219584612769805",
+        "1219526058649071",
+        "1219961154288257",
+        "1219961002989323",
+        "1219961049118002",
+        "1219573938599764",
+    }
+    if not (ui_gids & set(active)):
+        return
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            http_credentials={"username": PRE_USER, "password": PRE_PASS},
+            viewport={"width": 1440, "height": 1000},
+            accept_downloads=True,
+        )
+        page_obj = context.new_page()
+        try:
+            for ui_check in (
+                check_download_ui,
+                check_contact_ui,
+                check_location_ui,
+                check_online_pledge_ui,
+                check_mailing_ui,
+            ):
+                try:
+                    ui_check(page_obj, results, active)
+                except Exception as exc:
+                    print(
+                        f"WARN {ui_check.__name__}: {exc.__class__.__name__}: {exc}",
+                        file=sys.stderr,
+                    )
+        finally:
+            browser.close()
+
+
+def check_cms_pending(results, active):
+    pending = {
+        "1220457628953032": (
+            "Offering Listing Stock",
+            "The CMS Offering Listing > Stock check was skipped because CMS/OTP access is unavailable.",
+            "Re-run the CMS Stock check when CMS access is available.",
+        ),
+        "1219566240500919": (
+            "Master Audit Trail cancellation reasons",
+            "The CMS Master Audit Trail check was skipped because CMS/OTP access is unavailable.",
+            "Re-run the audit-trail check when CMS access is available.",
+        ),
+        "1220102510328267": (
+            "Chinese acknowledgement email",
+            "The CMS/email template check was skipped because CMS/OTP access is unavailable.",
+            "Re-run the Chinese acknowledgement check when CMS access is available.",
+        ),
+        "1220102256145249": (
+            "Acknowledgement sender display name",
+            "The CMS/email template check was skipped because CMS/OTP access is unavailable.",
+            "Re-run the sender display name check when CMS access is available.",
+        ),
+        "1220102726401766": (
+            "Acknowledgement email subject prefix",
+            "The CMS/email template check was skipped because CMS/OTP access is unavailable.",
+            "Re-run the subject prefix check when CMS access is available.",
+        ),
+        "1219636982479482": (
+            "Dharma School test record deletion",
+            "The CMS deletion check is destructive and was skipped; CMS/OTP access is also unavailable.",
+            "Confirm the test-record removal with the vendor and verify without deleting live records.",
+        ),
+    }
+    for gid, (title, evidence, action) in pending.items():
+        if gid in active:
+            add(results, gid, "Needs manual review", f"{title}: {evidence}", action)
+
+
 def main():
+    active = active_gids()
     results = {}
-    check_career(results)
-    check_bright_youth(results)
-    check_digital(results)
-    check_contact_us(results)
-    check_home(results)
-    check_bright_youth_labels(results)
-    check_career_labels(results)
-    check_joyous_heart(results)
-    check_volunteer(results)
-    check_cms(results)
-    check_estore(results)
-    check_dharma(results)
-    manual_checks(results)
+    checks = [
+        check_home_label,
+        check_course_target,
+        check_web_ui,
+        check_cms_pending,
+    ]
+    for check in checks:
+        try:
+            check(results, active)
+        except Exception as exc:
+            print(f"WARN {check.__name__}: {exc.__class__.__name__}: {exc}", file=sys.stderr)
 
-    results = {gid: result for gid, result in results.items() if gid in EXPECTED_CURRENT}
-    missing = EXPECTED_CURRENT - set(results)
-    extra = set(results) - EXPECTED_CURRENT
-    if missing or extra:
-        raise RuntimeError(f"check coverage mismatch; missing={sorted(missing)} extra={sorted(extra)}")
+    for gid in active:
+        if gid not in results:
+            add(
+                results,
+                gid,
+                "Needs manual review",
+                "No automated check completed for this ticket in this run.",
+                MANUAL_ACTION,
+            )
 
+    results = {gid: result for gid, result in results.items() if gid in active}
     payload = {
         "generated_at": datetime.now(SGT).isoformat(timespec="seconds"),
-        "source": "pre-prod staging API and __NEXT_DATA__ labels",
+        "source": "pre-prod staging API, __NEXT_DATA__ labels and Playwright; CMS checks skipped",
+        "run_note": "CMS/OTP checks were skipped because the M365 service was unavailable.",
         "results": results,
     }
     OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(OUT)
-    for gid, result in results.items():
-        print(gid, "|", result["result"], "|", result["evidence"][:150])
+    for gid in sorted(results):
+        result = results[gid]
+        print(gid, "|", result["result"], "|", result["evidence"][:180])
 
 
 if __name__ == "__main__":

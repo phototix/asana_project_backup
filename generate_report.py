@@ -292,6 +292,7 @@ def main():
     parser.add_argument("--datetime", default=datetime.now().strftime("%Y-%m-%d %H:%M"), help="Report date/time, e.g. 2026-10-21 21:00")
     parser.add_argument("--summary", default="", help="Short summary for the reports index")
     parser.add_argument("--output-dir", default=str(Path(__file__).resolve().parent / "reports-data"))
+    parser.add_argument("--filename", default="", help="Exact output HTML filename (optional)")
     args = parser.parse_args()
 
     try:
@@ -307,6 +308,15 @@ def main():
     source_dir = output_dir / "source"
     source_dir.mkdir(parents=True, exist_ok=True)
 
+    if args.filename:
+        filename = args.filename.strip()
+        if Path(filename).name != filename or not re.match(r"^[A-Za-z0-9._-]+\.html$", filename):
+            parser.error("--filename must be a plain .html filename")
+        base = Path(filename).stem
+        output_path = output_dir / filename
+    else:
+        output_path = output_dir / f"{base}.html"
+
     document = PAGE.format(
         title=html.escape(args.title, quote=False),
         title_attr=html.escape(args.title, quote=True),
@@ -317,7 +327,6 @@ def main():
         content=convert_markdown(markdown),
     )
 
-    output_path = output_dir / f"{base}.html"
     output_path.write_text(document, encoding="utf-8")
     source_copy = source_dir / f"{base}.md"
     if source.resolve() != source_copy.resolve():

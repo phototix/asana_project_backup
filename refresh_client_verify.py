@@ -23,7 +23,12 @@ SGT = timezone(timedelta(hours=8))
 PAGE = Path(__file__).resolve().parent / "reports-data" / "client-verify.html"
 RESULTS_PATH = Path(__file__).resolve().parent / "reports-data" / "check-results.json"
 TOKEN = load_env(ENV_PATH)["ASANA_TOKEN"]
-SECTION_GID = "1212426681919491"
+SECTION_GIDS = [
+    "1212426681919491",
+    "1212440848489031",
+    "1212440848489029",
+    "1212440848489033",
+]
 
 NEW_PATHS = {
     "1219730158203178": ["/join-us/career"],
@@ -60,13 +65,35 @@ NEW_PATHS = {
     "1219730214602139": ["/join-us/joyous-heart", "/zh/join-us/joyous-heart"],
     "1219730214723788": ["/join-us/career", "/zh/join-us/career"],
     "1219746446656349": ["/join-us/be-a-volunteer", "/zh/join-us/be-a-volunteer"],
+    "1219575604730061": ["/awaken-online/digital/-3", "/zh/awaken-online/digital/-3"],
+    "1219477239416627": [],
+    "1219636982479482": [],
+    "1219584612769805": ["/contact-us", "/zh/contact-us"],
+    "1219570452486142": ["/contact-us", "/zh/contact-us"],
+    "1219804537175138": [],
+    "1219573938599764": ["/", "/zh/"],
+    "1220102726401766": [],
+    "1220102386894700": [],
+    "1220102510328267": [],
+    "1219875631714216": ["/activities", "/zh/activities"],
+    "1219729871505000": ["/", "/zh/"],
+    "1219729886373019": ["/join-us/career", "/zh/join-us/career"],
+    "1220102256145249": [],
+    "1219566240500919": [],
+    "1220457628953032": ["/offerings", "/zh/offerings"],
+    "1219961002989323": ["/activities/online-pledged/3-refuge-5-precepts", "/zh/activities/online-pledged/3-refuge-5-precepts"],
+    "1219526058649071": ["/dharma-education/school/location", "/zh/dharma-education/school/location"],
+    "1219961049118002": ["/activities/online-pledged", "/zh/activities/online-pledged"],
+    "1219961154288257": ["/activities/online-pledged", "/zh/activities/online-pledged"],
 }
 
 CHECKS = {}
+RUN_NOTE = ""
 
 if RESULTS_PATH.exists():
     payload = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
     CHECKS = payload.get("results", payload)
+    RUN_NOTE = payload.get("run_note", "")
 
 
 def badge_for(result):
@@ -143,6 +170,20 @@ def next_action(live, assignee, result):
         if result == "Content action":
             return "Complete the content action and verify."
         return "Verify on pre-prod and close if pass."
+    if live == "Fix In Progress":
+        return "Codigo to fix; verify after deployment."
+    if live.startswith("Fail"):
+        return "Vendor to fix and retest."
+    if live == "QA to verify":
+        return "KMS QA to verify and close if pass."
+    if live == "To disscuss/confirm":
+        return "Confirm with Marcomm/users; Codigo to implement once confirmed."
+    if live == "New Request on Pre-prod":
+        return "Marcomm/users to prioritise; Codigo to advise feasibility and CR implications."
+    if live == "To update hardcoded content":
+        return "Brandon to supply content; Codigo to update."
+    if live.startswith("To verify again"):
+        return "KMS internal review; CR items are not part of agreed delivery."
     return "Review and follow up."
 
 
@@ -202,16 +243,17 @@ table{min-width:1800px}
         }
 
     current = []
-    offset = None
-    while True:
-        params = {"limit": 100, "opt_fields": "name,assignee.name"}
-        if offset:
-            params["offset"] = offset
-        payload = api_request(TOKEN, "GET", f"/sections/{SECTION_GID}/tasks", params=params)
-        current += payload.get("data", [])
-        offset = (payload.get("next_page") or {}).get("offset")
-        if not offset:
-            break
+    for section_gid in SECTION_GIDS:
+        offset = None
+        while True:
+            params = {"limit": 100, "opt_fields": "name,assignee.name"}
+            if offset:
+                params["offset"] = offset
+            payload = api_request(TOKEN, "GET", f"/sections/{section_gid}/tasks", params=params)
+            current += payload.get("data", [])
+            offset = (payload.get("next_page") or {}).get("offset")
+            if not offset:
+                break
 
     built = []
     live_counts = Counter()
@@ -220,8 +262,11 @@ table{min-width:1800px}
 
     for gid, item in existing.items():
         live, assignee, _ = live_state(gid)
-        codigo = latest_comment(gid) if live == "Client to verify" else item["codigo"]
+        codigo = latest_comment(gid) if live != "Closed" else item["codigo"]
         check = CHECKS.get(gid)
+        preprod = item["preprod"]
+        if NEW_PATHS.get(gid):
+            preprod = render_preprod_cell(" and ".join(NEW_PATHS[gid]))
         if check:
             result = check["result"]
             ticket = relabel_ticket(item["ticket"], check.get("label") or ticket_label(result))
@@ -239,7 +284,7 @@ table{min-width:1800px}
         built.append({
             "gid": gid, "name": item["name"], "live": live, "assignee": assignee,
             "change": change, "result": result, "ticket": ticket, "asana": item["asana"],
-            "codigo": codigo, "preprod": item["preprod"], "result_cell": result_cell,
+            "codigo": codigo, "preprod": preprod, "result_cell": result_cell,
             "evidence": evidence, "action": action,
         })
         live_counts[live] += 1
@@ -250,21 +295,23 @@ table{min-width:1800px}
         gid = task["gid"]
         if gid in existing:
             continue
+        if not (task.get("name") or "").strip():
+            continue
         live, assignee, name = live_state(gid)
         if not name:
             name = task.get("name") or gid
         check = CHECKS.get(gid)
         if check:
             result = check["result"]
-            change = "Added to Client to verify" if live != "Closed" else "No change"
+            change = f"Added to {live}" if live != "Closed" else "No change"
             action = "None; closed." if live == "Closed" else check["action"]
             ticket_small = check.get("label") or ticket_label(result)
             result_cell = badge_for(result)
             evidence = check["evidence"]
         else:
             result = "Not yet checked"
-            change = "Added to Client to verify"
-            action = next_action("Client to verify", assignee, result)
+            change = f"Added to {live}"
+            action = next_action(live, assignee, result)
             ticket_small = "Not yet checked"
             result_cell = '<span class="badge review">Not yet checked</span>'
             evidence = "No automated check yet; added from the live Client to verify queue."
@@ -293,7 +340,7 @@ table{min-width:1800px}
     for r in built:
         live_class = {"Closed": "pass", "Client to verify": "review"}.get(r["live"], "fail" if r["live"].startswith("Fail") else "review")
         change_class = {"Closed since last run": "closed", "Added to Client to verify": "added", "No change": "none"}.get(
-            r["change"], "added" if r["change"].startswith("Moved to ") else "none"
+            r["change"], "added" if r["change"].startswith(("Moved to ", "Added to ")) else "none"
         )
         rows.append(
             "<tr data-live=\"{live}\" data-assignee=\"{assignee}\" data-change=\"{change}\" data-result=\"{result}\">"
@@ -323,7 +370,8 @@ table{min-width:1800px}
         if live_counts.get(v)
     )
     assignee_values = [v for v in ["Brandon", "Dexter"] if any(k[1] == v for k in assignee_counts)]
-    if assignee_counts.get(("Client to verify", "-"), 0):
+    assignee_values += sorted({k[1] for k in assignee_counts if k[1] not in ("Brandon", "Dexter", "-")})
+    if any(k[1] == "-" for k in assignee_counts):
         assignee_values.append("-")
     assignee_options = "".join(
         f'<option value="{html.escape(v, quote=True)}">{html.escape("Unassigned" if v == "-" else v)}</option>'
@@ -343,7 +391,7 @@ table{min-width:1800px}
     cb = assignee_counts.get(("Client to verify", "Brandon"), 0)
     cd = assignee_counts.get(("Client to verify", "Dexter"), 0)
     cu = assignee_counts.get(("Client to verify", "-"), 0)
-    added_count = sum(1 for r in built if r["change"] == "Added to Client to verify")
+    added_count = sum(1 for r in built if r["change"].startswith("Added to "))
     closed_count = sum(1 for r in built if r["change"] == "Closed since last run")
     checked_count = sum(1 for r in built if r["gid"] in CHECKS)
     unchecked = result_counts.get("Not yet checked", 0)
@@ -365,6 +413,14 @@ table{min-width:1800px}
         if cu
         else ""
     )
+    queue_parts = []
+    if cb:
+        queue_parts.append(f"{cb} Brandon")
+    if cd:
+        queue_parts.append(f"{cd} Dexter")
+    if cu:
+        queue_parts.append(f"{cu} unassigned")
+    queue_text = ", ".join(queue_parts)
     cards = f"""<div class="card"><div class="num">{len(built)}</div><div class="label">Total</div></div>
 <div class="card"><div class="num">{live_counts.get("Closed",0)}</div><div class="label">Closed</div></div>
 <div class="card"><div class="num">{cb}</div><div class="label">Client to verify — Brandon</div></div>
@@ -381,19 +437,27 @@ table{min-width:1800px}
         f'Content action {result_counts.get("Content action",0)}. '
         f'{added_line}</p>'
     )
+    active_result_counts = Counter(r["result"] for r in built if r["live"] != "Closed")
+    active_summary_line = (
+        f'<p class="small">Open rows (excluding Closed): Pass {active_result_counts.get("Pass",0)} · '
+        f'Fail {active_result_counts.get("Fail",0)} · '
+        f'Needs manual review {active_result_counts.get("Needs manual review",0)} · '
+        f'Content action {active_result_counts.get("Content action",0)}.</p>'
+    )
     move_suffix = f"; {move_text}" if move_text else ""
+    run_note_text = f" {RUN_NOTE}" if RUN_NOTE else ""
     if unchecked:
         note = (
             f"Live status refreshed from Asana on {now.strftime('%d %b %Y, %I:%M %p')} SGT. "
             f"{added_count} new ticket(s) added{move_suffix}; {unchecked} not yet checked; "
-            f"{cu} unassigned. No Asana writes by this refresh."
+            f"{cu} unassigned. No Asana writes by this refresh.{run_note_text}"
         )
     else:
         note = (
             f"Live status refreshed from Asana on {now.strftime('%d %b %Y, %I:%M %p')} SGT. "
             f"{added_count} new ticket(s) added{move_suffix}; {checked_count} rows checked; "
             f"{cu} unassigned. Items marked Needs manual review still need a human check. "
-            "No Asana writes by this refresh."
+            f"No Asana writes by this refresh.{run_note_text}"
         )
 
     document = f"""<!doctype html>
@@ -413,7 +477,7 @@ table{min-width:1800px}
   <div>
     <div class="brand">KMSPKS UAT</div>
     <h1>Client verification</h1>
-    <div class="meta">Client to verify · {live_counts.get("Client to verify",0)} in queue ({cb} Brandon, {cd} Dexter, {cu} unassigned) · status refreshed {now.strftime('%d %b %Y, %I:%M %p')} SGT</div>
+    <div class="meta">Client to verify · {live_counts.get("Client to verify",0)} in queue ({queue_text}) · status refreshed {now.strftime('%d %b %Y, %I:%M %p')} SGT</div>
   </div>
   <nav class="nav">
     <a class="btn" href="/reports/">Reports</a>
@@ -427,6 +491,7 @@ table{min-width:1800px}
 
 <div class="cards">{cards}</div>
 {summary_line}
+{active_summary_line}
 
 <div class="filters">
   <input id="search" type="search" placeholder="Search ticket, comment or evidence..." oninput="applyFilters()">

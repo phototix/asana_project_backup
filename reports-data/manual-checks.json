@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-11-18T00:09:13+08:00",
+  "overall": "pass",
+  "summary": {
+    "overall": "pass",
+    "pass": 11,
+    "warn": 0,
+    "fail": 0,
+    "skip": 0
+  },
+  "results": [
+    {
+      "name": "Content completeness",
+      "status": "pass",
+      "detail": "All sections have English and Chinese titles, intros and steps.",
+      "count": 51
+    },
+    {
+      "name": "Figure references",
+      "status": "pass",
+      "detail": "All 117 referenced figures exist.",
+      "count": 117
+    },
+    {
+      "name": "Bilingual parity",
+      "status": "pass",
+      "detail": "51 sections checked; both languages present in every section.",
+      "count": 51
+    },
+    {
+      "name": "Screenshot integrity",
+      "status": "pass",
+      "detail": "215 screenshots present and non-trivial in size.",
+      "count": 215
+    },
+    {
+      "name": "PII text scan",
+      "status": "pass",
+      "detail": "No personal emails, phone numbers or NRIC/FIN patterns in the manual text. Screenshots are masked at capture time.",
+      "count": 0
+    },
+    {
+      "name": "PDF structure",
+      "status": "pass",
+      "detail": "114 A4 pages, 117 embedded images, key headings present.",
+      "count": 114
+    },
+    {
+      "name": "DOCX structure",
+      "status": "pass",
+      "detail": "116 headings, 117 images, 39 tables; title='KMSPKS Codigo User Manual'.",
+      "count": 116
+    },
+    {
+      "name": "CMS route coverage",
+      "status": "pass",
+      "detail": "All 112 static CMS routes have a captured screenshot.",
+      "count": 112
+    },
+    {
+      "name": "Public coverage",
+      "status": "pass",
+      "detail": "All 18 key public and member screenshots are present.",
+      "count": 18
+    },
+    {
+      "name": "Download page",
+      "status": "pass",
+      "detail": "Download page links to the PDF and DOCX, includes report metadata, and both files exist.",
+      "count": 3
+    },
+    {
+      "name": "Live public checks",
+      "status": "pass",
+      "detail": "14 key public URLs reachable with HTTP 200.",
+      "count": 14
+    }
+  ]
+}

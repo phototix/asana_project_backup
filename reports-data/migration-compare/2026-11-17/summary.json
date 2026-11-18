@@ -1,0 +1,108 @@
+{
+ "generated_at": "2026-11-17T12:36:53.858479+08:00",
+ "correction_note": "Rebuilt from the Task Manager project CSV export. The earlier page/RSC audit missed 8 lazy-loaded Closed tasks.",
+ "asana_total": 303,
+ "asana_top_level": 298,
+ "asana_subtasks": 5,
+ "new_total_items": 337,
+ "new_top_level": 298,
+ "new_subtasks": 39,
+ "matched": 302,
+ "missing": 1,
+ "extra_new_items": 35,
+ "extra_new_top_level": 0,
+ "extra_new_subtasks": 35,
+ "status_mismatch": [
+  "[Web] Contact Us - Acknowledgement email Chinese version"
+ ],
+ "assignee_mismatch": [
+  "[Web] Contact Us - Acknowledgement email Chinese version"
+ ],
+ "due_mismatch": [
+  "[Web] Contact Us - Acknowledgement email Chinese version"
+ ],
+ "comment_mismatch": [],
+ "attachment_mismatch": [
+  "[Web & CMS] Contents not loading and unable to update",
+  "[Web] Awaken Online - Articles - Text interface",
+  "[Web] - Join Us - Volunteer - Volunteer Events Section",
+  "CMS - Activities Listing issues",
+  "[Awaken Online] Article drafts cannot be published",
+  "[E-Store] Email Configuration",
+  "[CMS] Finance - Code Management module",
+  "[CMS] Bright Youth Page Upload Image",
+  "[E-Store] Additional Info Sections Error",
+  "Select date range for Facility Bookings - Internal Facilities",
+  "[E-Store] Add a Home button in Product Detail Page",
+  "Terms and Conditions under Payment Page",
+  "[CMS} Estore - \"Product Details\" - unable to edit \" Preorder up to 3 days in advance.   Self collection only. \"",
+  "[CMS] Dharma Course (for adult) course setup should be under Dharma School",
+  "[CMS] Dharma School Course Setup - Age range",
+  "There is ? mark on Low Income table header",
+  "The current implementation does not appear to match the Figma design.",
+  "[CMS] Bright Youth Membership -> Pillars Master Data",
+  "Add reason of no-show"
+ ],
+ "attachment_video_loss": [
+  {
+   "task": "[Web & CMS] Contents not loading and unable to update",
+   "file": "Screen Recording 2026-10-15 at 12.04.05.mov"
+  },
+  {
+   "task": "[Web] Awaken Online - Articles - Text interface",
+   "file": "Screen Recording 2026-11-12 at 10.05.17.mov"
+  },
+  {
+   "task": "[Web] - Join Us - Volunteer - Volunteer Events Section",
+   "file": "Screen Recording 2026-10-27 at 12.40.40.mov"
+  },
+  {
+   "task": "[Awaken Online] Article drafts cannot be published",
+   "file": "KMS CMS - Google Chrome 2026-06-11 12-39-49.mp4"
+  },
+  {
+   "task": "[CMS] Finance - Code Management module",
+   "file": "Screen Recording 2026-07-07 at 10.23.42.mov"
+  },
+  {
+   "task": "[CMS] Bright Youth Page Upload Image",
+   "file": "Screen Recording 2026-07-07 at 09.44.52.mov"
+  },
+  {
+   "task": "[E-Store] Additional Info Sections Error",
+   "file": "KMS CMS - Google Chrome 2026-06-12 09-10-15.mp4"
+  },
+  {
+   "task": "Select date range for Facility Bookings - Internal Facilities",
+   "file": "Screen Recording 2026-06-11 at 08.48.31.mov"
+  }
+ ],
+ "attachment_link_loss_count": 12,
+ "attachment_link_loss_tasks": [
+  "Add reason of no-show",
+  "CMS - Activities Listing issues",
+  "Terms and Conditions under Payment Page",
+  "The current implementation does not appear to match the Figma design.",
+  "There is ? mark on Low Income table header",
+  "[CMS] Bright Youth Membership -> Pillars Master Data",
+  "[CMS] Dharma Course (for adult) course setup should be under Dharma School",
+  "[CMS] Dharma School Course Setup - Age range",
+  "[CMS} Estore - \"Product Details\" - unable to edit \" Preorder up to 3 days in advance.   Self collection only. \"",
+  "[E-Store] Add a Home button in Product Detail Page",
+  "[E-Store] Email Configuration"
+ ],
+ "attachment_other_loss": [],
+ "diffs": {
+  "section": 2,
+  "assignee": 1,
+  "due": 1,
+  "attachments": 19
+ },
+ "missing_tasks": [
+  {
+   "gid": "1219961596020711",
+   "name": "",
+   "section": "Open Tickets"
+  }
+ ]
+}

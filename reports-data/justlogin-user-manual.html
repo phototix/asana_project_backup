@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JustLogin User Manual - KMSPKS</title>
+<meta name="report-title" content="JustLogin User Manual - KMSPKS">
+<meta name="report-date" content="2026-11-17T16:30:00+08:00">
+<meta name="report-summary" content="View-only Admin user manual for JustLogin: login, dashboard, attendance, people, settings, user administration, and masked screenshots.">
+<meta name="robots" content="noindex,nofollow">
+<style>
+:root{--bg:#f7f4ee;--panel:#fffdf8;--ink:#1f1a12;--muted:#6d5f4e;--line:#ddd2bf;--accent:#7d2b1f;--purple:#5b3fa0;--purple-dark:#3d286e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.55}
+.page{max-width:980px;margin:0 auto;padding:1.25rem}
+.top{display:flex;justify-content:space-between;align-items:center;gap:1rem;border-bottom:1px solid var(--line);padding-bottom:.75rem;margin-bottom:1rem;flex-wrap:wrap}
+.brand{font-size:1.1rem}
+.btn{display:inline-block;border:1px solid #d8c9b2;background:#fff;color:#5c3a1f;border-radius:6px;padding:.42rem .72rem;text-decoration:none;font-size:.9rem;margin-left:.35rem}
+.btn:hover{background:#f9f2e6;text-decoration:none}
+.btn.primary{background:var(--purple);border-color:var(--purple-dark);color:#fff}
+.btn.primary:hover{background:var(--purple-dark)}
+.hero{background:linear-gradient(135deg,#2f1b52,#5b3fa0 62%,#8d72cf);color:#fff;border-radius:10px;padding:1.4rem 1.5rem;margin-bottom:1rem}
+.hero .kicker{font-family:Arial,Helvetica,sans-serif;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+.hero h1{font-size:2rem;line-height:1.15;margin:.25rem 0 .3rem}
+.hero p{margin:0;color:#eee7ff;max-width:720px}
+.meta{color:var(--muted);font-size:.9rem;margin:.15rem 0 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1rem 1.1rem;margin-bottom:1rem}
+.panel h2{margin:.1rem 0 .5rem;font-size:1.1rem}
+.note{background:#eef3f8;border:1px solid #b9cfe2;color:#22384d;border-radius:8px;padding:.75rem .85rem;margin:.65rem 0 0;font-size:.92rem}
+.warning{background:#fff0ee;border:1px solid #e2b8b0;color:#5d1e16;border-radius:8px;padding:.75rem .85rem;margin:.65rem 0 0;font-size:.92rem}
+ul{margin:.4rem 0 .2rem;padding-left:1.35rem}
+li{margin:.18rem 0}
+.small{color:var(--muted);font-size:.84rem}
+footer{margin-top:1.2rem;border-top:1px solid var(--line);padding-top:.7rem;color:var(--muted);font-size:.82rem}
+@media (max-width:640px){.page{padding:.9rem}.hero h1{font-size:1.55rem}.top{align-items:flex-start}.btn{margin:.2rem .35rem .2rem 0}}
+@media print{.top,.btn,footer{display:none}.hero{background:#fff;color:#1f1a12;border:2px solid var(--purple)}.hero p{color:#3d301f}.page{max-width:none;padding:0}}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+  <div class="brand">KMSPKS UAT Reports</div>
+  <nav>
+    <a class="btn" href="/reports/">Reports</a>
+    <a class="btn" href="/reports/justlogin-pre-uat-report.html">Pre-UAT Report</a>
+    <a class="btn" href="/">Backups</a>
+    <a class="btn" href="/logout">Logout</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="kicker">KMSPKS · Admin Guide</div>
+  <h1>JustLogin User Manual</h1>
+  <p>View-only operational guide for the KMSPKS production tenant. Covers login, dashboard, attendance, people, settings, and user administration.</p>
+</section>
+
+<div class="meta">Version 1.0 · 17 November 2026 · Prepared by opencode</div>
+
+<section class="panel" style="margin-top:1rem;">
+  <h2>Download the manual</h2>
+  <p>The PDF is a 53-page A4 guide with numbered steps, screenshots, safety callouts, and a page index. Personal and employee data has been masked in the screenshots.</p>
+  <p>
+    <a class="btn primary" href="/reports/justlogin-user-manual.pdf" target="_blank" rel="noopener">Open PDF manual</a>
+    <a class="btn" href="/reports/justlogin-user-manual.pdf" download>Download PDF</a>
+    <a class="btn" href="/reports/justlogin-user-manual.docx" download>Download editable DOCX</a>
+  </p>
+  <p class="small">The DOCX is the editable working copy, including an “Editing this working copy” page and revision-history table. The PDF is the published copy.</p>
+  <div class="note"><strong>View-only:</strong> no production data was created, updated, deleted, submitted, approved, exported, or downloaded while preparing this manual.</div>
+  <div class="warning"><strong>Training:</strong> use a non-production tenant and test accounts for hands-on practice. Do not follow add, edit, or remove steps in production without approval.</div>
+</section>
+
+<section class="panel">
+  <h2>What the manual covers</h2>
+  <ul>
+    <li>Sign in, Forgot Password, SSO, profile menu, My Settings, and logout</li>
+    <li>Dashboard, Action Center, Customize, and company links</li>
+    <li>Attendance: Dashboard, Approval Central, Roster, Reports, Administration, and Configuration</li>
+    <li>People: profile, Employees directory, More Actions, Approvals, OED, and OED History</li>
+    <li>Settings: Employee Fields, Employee ID, Company Directory, Share Company Access, Training, Access Levels, Approvals, Public Holiday, Dashboard Configuration, and Custom Notifications</li>
+    <li>User Administration: Add User and Employee Roles</li>
+    <li>Common add/edit/remove guidance, known limitations, and screenshot index</li>
+  </ul>
+</section>
+
+<section class="panel">
+  <h2>Important notes</h2>
+  <ul>
+    <li>The manual is a reference, not an authorisation to change production records.</li>
+    <li>Screenshots have names, emails, phone numbers, and other personal data masked.</li>
+    <li>Some pages showed empty states or known limitations during capture; these are recorded in the manual.</li>
+    <li>Use the Help icon in JustLogin or the organisation’s support channel for issues not covered by the manual.</li>
+  </ul>
+</section>
+
+<footer>JustLogin User Manual · KMSPKS · Version 1.0 · View-only reference · 17 November 2026</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KMSPKS Codigo User Manual - KMSPKS</title>
+<meta name="report-title" content="KMSPKS Codigo User Manual">
+<meta name="report-date" content="2026-11-17T23:30:00+08:00">
+<meta name="report-summary" content="Bilingual view-only training manual for the KMSPKS public website and CMS, with role-based guides, masked screenshots, PDF and editable DOCX.">
+<meta name="robots" content="noindex,nofollow">
+<style>
+:root{--bg:#f7f1e7;--panel:#fffdf8;--ink:#221c16;--muted:#6d5f4e;--line:#ded2bf;--maroon:#7d2b1f;--maroon-dark:#4f1a12;--gold:#b8860b;--gold-soft:#f3e6c8;--green:#24522a;--green-bg:#f0f7ee;--red:#8c261a;--red-bg:#fff0ee;--blue:#274b6d;--blue-bg:#eef3f8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"WenQuanYi Zen Hei","Droid Sans Fallback","Times New Roman",serif;line-height:1.55}
+a{color:var(--maroon);text-decoration:none}a:hover{text-decoration:underline}
+.page{max-width:1040px;margin:0 auto;padding:1.1rem}
+.top{display:flex;justify-content:space-between;align-items:center;gap:1rem;border-bottom:1px solid var(--line);padding-bottom:.8rem;margin-bottom:1rem;flex-wrap:wrap}
+.brand{font-size:1.15rem;font-weight:bold;color:var(--maroon-dark)}
+.btn{display:inline-block;border:1px solid #d8c9b2;background:#fff;color:#5c3a1f;border-radius:6px;padding:.45rem .75rem;text-decoration:none;font-size:.9rem;margin-left:.35rem}
+.btn:hover{background:#f9f2e6;text-decoration:none}
+.btn.primary{background:var(--maroon);border-color:var(--maroon-dark);color:#fff}
+.btn.primary:hover{background:var(--maroon-dark)}
+.btn.gold{background:var(--gold);border-color:#8a6508;color:#fff}
+.btn.gold:hover{background:#8a6508}
+.hero{background:linear-gradient(145deg,#2e1712,#6e241b 55%,#a34a2c);color:#fff;border-radius:12px;padding:1.6rem 1.6rem;margin-bottom:1rem;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;width:280px;height:280px;border:1px solid rgba(255,255,255,.22);border-radius:50%;right:-90px;bottom:-120px}
+.hero .kicker{font-family:Arial,Helvetica,sans-serif;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:#f3d9b5}
+.hero h1{font-size:2.35rem;line-height:1.08;margin:.35rem 0 .35rem;letter-spacing:-.01em}
+.hero .zh{font-family:"WenQuanYi Zen Hei","Droid Sans Fallback",sans-serif;font-size:1.25rem;color:#f3e6c8;margin:0 0 .5rem}
+.hero p{margin:0;color:#f6e8df;max-width:760px}
+.badge{display:inline-block;border:1px solid rgba(255,255,255,.55);border-radius:99px;padding:.25rem .7rem;font-family:Arial,Helvetica,sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;margin-top:.9rem}
+.meta{color:var(--muted);font-size:.9rem;margin:.15rem 0 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:1rem 1.1rem;margin-bottom:1rem}
+.panel h2{margin:.1rem 0 .5rem;font-size:1.15rem;color:var(--maroon-dark)}
+.panel h3{margin:.8rem 0 .25rem;font-size:1rem;color:var(--maroon)}
+ul{margin:.4rem 0 .3rem;padding-left:1.35rem}li{margin:.18rem 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.7rem}
+.card{border:1px solid var(--line);border-radius:8px;background:#fdfaf4;padding:.75rem .85rem}
+.card h3{margin:.1rem 0 .3rem;font-size:.98rem;color:var(--maroon)}
+.small{color:var(--muted);font-size:.84rem}
+.note{background:var(--blue-bg);border:1px solid #b9cfe2;color:#22384d;border-radius:8px;padding:.75rem .85rem;margin:.65rem 0 0;font-size:.92rem}
+.warning{background:var(--red-bg);border:1px solid #e2b8b0;color:#5d1e16;border-radius:8px;padding:.75rem .85rem;margin:.65rem 0 0;font-size:.92rem}
+.tip{background:var(--green-bg);border:1px solid #bdd9b8;color:#24482a;border-radius:8px;padding:.75rem .85rem;margin:.65rem 0 0;font-size:.92rem}
+table{width:100%;border-collapse:collapse;font-size:.9rem;margin:.4rem 0}
+th,td{border-bottom:1px solid #eee2cf;text-align:left;padding:.5rem;vertical-align:top}
+th{background:#f4ecdf;color:var(--maroon-dark);font-family:Arial,Helvetica,sans-serif;font-size:.8rem}
+.status{display:inline-block;background:#e7f5e9;color:#1f6b3a;border:1px solid #b9dcc0;border-radius:99px;padding:.12rem .55rem;font-family:Arial,Helvetica,sans-serif;font-size:.74rem;font-weight:bold}
+footer{margin-top:1.2rem;border-top:1px solid var(--line);padding-top:.75rem;color:var(--muted);font-size:.82rem}
+@media (max-width:640px){.hero h1{font-size:1.7rem}.top{align-items:flex-start}.btn{margin:.2rem .35rem .2rem 0}}
+@media print{.top,.btn,footer{display:none}.hero{background:#fff;color:var(--ink);border:2px solid var(--maroon)}.hero p,.hero .zh{color:var(--ink)}}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+  <div class="brand">KMSPKS UAT Reports</div>
+  <nav>
+    <a class="btn" href="/reports/">Reports</a>
+    <a class="btn" href="/reports/client-verify.html">Verify</a>
+    <a class="btn" href="/reports/cms-managed.html">CMS</a>
+    <a class="btn" href="/">Backups</a>
+    <a class="btn" href="/logout">Logout</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="kicker">KMSPKS · Codigo · User Training</div>
+  <h1>KMSPKS Codigo User Manual</h1>
+  <div class="zh">KMSPKS Codigo 用户手册</div>
+  <p>Bilingual, view-only training and operations guide for the KMSPKS public website and CMS. Covers visitor and member journeys, CMS basics, role guides, FAQ and common situations.</p>
+  <p class="small" style="color:#f0dccb;">双语只读培训与操作指南，涵盖公众网站、会员流程、CMS 基础、角色指南、常见问题及常见情况。</p>
+  <div class="badge">Version 1.0 · 17 November 2026 · View only / 仅查看</div>
+</section>
+
+<div class="meta">Version 1.0 · 17 November 2026 · Prepared by IT Dept · 51 sections · 117 figures · 114 PDF pages</div>
+
+<section class="panel" style="margin-top:1rem;">
+  <h2>Download the manual / 下载手册</h2>
+  <p>The PDF is the published A4 copy. The DOCX is the editable working copy with heading styles, revision history and an editing guide. Both contain English and 中文 content.</p>
+  <p class="small">PDF 为发布的 A4 版本；DOCX 为可编辑工作副本，包含标题样式、版本记录及编辑指南。两者均包含英文与中文内容。</p>
+  <p>
+    <a class="btn primary" href="/reports/KMSPKS-Codigo-User-Manual.pdf" target="_blank" rel="noopener">Open PDF / 打开 PDF</a>
+    <a class="btn" href="/reports/KMSPKS-Codigo-User-Manual.pdf" download>Download PDF / 下载 PDF</a>
+    <a class="btn gold" href="/reports/KMSPKS-Codigo-User-Manual.docx" download>Download DOCX / 下载 DOCX</a>
+    <a class="btn" href="/reports/KMSPKS-Codigo-User-Manual-checks.html">Automated checks / 自动检查</a>
+  </p>
+  <div class="note"><strong>Monastery guideline / 寺院准则:</strong> Monastery guideline: use this manual in accordance with the Monastery's IT security, data protection and content approval policies. Handle all member and staff information confidentially, and obtain approval before changing live content or records. 寺院准则：请依照本寺的资讯科技安全、资料保护及内容审批政策使用本手册。所有会员及职员资料均须保密，修改线上内容或记录前须取得批准。</div>
+  <div class="warning"><strong>Training / 培训:</strong> use a non-production environment and test accounts for hands-on practice. Do not follow add, edit, delete, publish or approval steps in production without approval. 实际操作练习请使用非生产环境及测试账户。未经批准，请勿在生产环境执行新增、编辑、删除、发布或审批操作。</div>
+</section>
+
+<section class="panel">
+  <h2>What is inside / 内容概览</h2>
+  <div class="grid">
+    <div class="card"><h3>Part 1 · Public site / 公众网站</h3><p class="small">Sign-in with mobile OTP, home, about, visit, services, activities, Dharma Education, Awaken Online, donations, e-store, Join Us, contact and member account. 手机验证码登录、首页、关于、导览、服务、活动、佛学教育、Awaken Online、捐款、网上商店、加入我们、联系及会员账户。</p></div>
+    <div class="card"><h3>Part 2 · CMS basics / CMS 基础</h3><p class="small">CMS login and OTP, navigation, list/search, add, edit, delete confirmation, publish/draft, media validation, roles and audit trail. CMS 登录与验证码、导航、列表/搜索、新增、编辑、删除确认、发布/草稿、媒体验证、角色及审计记录。</p></div>
+    <div class="card"><h3>Part 3 · Role guides / 角色指南</h3><p class="small">Content editor, activities, check-in kiosk, Dharma School, donations/e-store, facilities, membership/volunteer, career/monkhood, finance and system admin. 内容编辑、活动、签到台、佛学班、捐款/网上商店、设施、会员/义工、招聘/出家、财务及系统管理。</p></div>
+    <div class="card"><h3>Part 4 · Reference / 参考资料</h3><p class="small">Public-to-CMS map, FAQ, common situations, glossary and revision history. 公众页面与 CMS 对照、常见问题、常见情况、词汇表及版本记录。</p></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Who should read it / 适用对象</h2>
+  <ul>
+    <li><strong>All staff / 全体职员:</strong> public-site navigation, member support, CMS sign-in and view-only rules.</li>
+    <li><strong>Content editors / 内容编辑:</strong> homepage, content pages, services, visit, Awaken, career and membership pages.</li>
+    <li><strong>Operations teams / 运营团队:</strong> activities, check-in, Dharma School, donations, e-store, facilities, membership and volunteer.</li>
+    <li><strong>Finance and administrators / 财务与管理员:</strong> code management, reports, accounts, roles, email, GST and audit trail.</li>
+  </ul>
+</section>
+
+<section class="panel">
+  <h2>Automated checks / 自动检查 <span class="status">PASS</span></h2>
+  <p>The manual was validated against the captured pages and generated files. The check summary covers public-page health, member journeys, CMS route coverage, screenshot privacy, bilingual parity and PDF/DOCX integrity.</p>
+  <table>
+    <thead><tr><th>Check / 检查</th><th>Coverage / 覆盖</th><th>Result / 结果</th></tr></thead>
+    <tbody>
+      <tr><td>Public site / 公众网站</td><td>72 captured pages, EN and 中文, key journeys / 72 个截图页面，中英文，关键流程</td><td><span class="status">PASS</span></td></tr>
+      <tr><td>Member account / 会员账户</td><td>14 account pages using the test member / 使用测试会员的 14 个账户页面</td><td><span class="status">PASS</span></td></tr>
+      <tr><td>CMS coverage / CMS 覆盖</td><td>112 static routes plus add/edit/delete samples / 112 个静态路由及新增/编辑/删除示例</td><td><span class="status">PASS</span></td></tr>
+      <tr><td>Screenshot privacy / 截图隐私</td><td>Names, emails, phones, member IDs and UUIDs masked / 姓名、电邮、电话、会员编号及 UUID 已遮蔽</td><td><span class="status">PASS</span></td></tr>
+      <tr><td>PDF and DOCX / PDF 与 DOCX</td><td>114 A4 pages, 117 figures, 116 DOCX headings, 39 tables / 114 页 A4、117 张图、116 个 DOCX 标题、39 个表格</td><td><span class="status">PASS</span></td></tr>
+    </tbody>
+  </table>
+  <p class="small">Re-run the checks before future releases. The latest machine-readable result is stored with the manual. 未来发布前请重新运行检查。最新机器可读结果随手册保存。</p>
+</section>
+
+<section class="panel">
+  <h2>Common situations and what to do / 常见情况及处理方式</h2>
+  <p>The following situations are common. They usually relate to data, filters or role permissions rather than a system fault.</p>
+  <p class="small">以下为常见情况，通常与数据、筛选或角色权限有关，而不一定是系统故障。</p>
+  <ul>
+    <li>If the Dharma School page shows “No Courses Available”, the admission window may be closed or courses may not yet be published. Check with the Dharma School team before advising the public. 若佛学班页面显示“暂无课程”，招生期可能已关闭或课程尚未发布。在告知公众前，请先向佛学班团队确认。</li>
+    <li>If KMS Members or Student Records is empty, clear the filters and search again. If it is still empty, ask the CMS administrator to confirm your access. 若 KMS 会员或学生记录为空，请清除筛选后重新搜索。若仍为空，请 CMS 管理员确认您的访问权限。</li>
+    <li>If Export Mailing List or Online Payments shows “Forbidden”, your role does not include that module. Request access through your administrator or Finance. 若导出邮件列表或线上付款显示“禁止访问”，表示您的角色不包含该模块。请通过管理员或财务申请权限。</li>
+    <li>If you cannot find a public page in the CMS, it may be static or maintained by another team. Contact the CMS administrator instead of editing the page directly. 若在 CMS 中找不到某个公众页面，该页面可能为静态页面或由其他团队维护。请联系 CMS 管理员，不要直接修改页面。</li>
+    <li>To remove content, unpublish or archive it first. Delete only with written approval. 如需移除内容，请先取消发布或归档。仅在取得书面批准后删除。</li>
+  </ul>
+</section>
+
+<section class="panel">
+  <h2>Revision history / 版本记录</h2>
+  <table>
+    <thead><tr><th>Version / 版本</th><th>Date / 日期</th><th>Editor / 编辑者</th><th>Change / 变更</th></tr></thead>
+    <tbody>
+      <tr><td>1.0</td><td>17 Nov 2026<br>2026年11月17日</td><td>IT Dept</td><td>Initial bilingual view-only manual, PDF and editable DOCX working copy. 首版双语只读手册、PDF 及可编辑 DOCX 工作副本。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="panel">
+  <h2>Support and escalation / 支援与上报</h2>
+  <p>For access, roles, OTP or content changes, contact the CMS administrator or the owning department. Include the page URL, time, what you expected and what you saw. For public-site enquiries, use the Contact Us page or the department helpdesk.</p>
+  <p class="small">如需访问权限、角色、验证码或内容变更，请联系 CMS 管理员或负责部门。请提供页面网址、时间、预期结果及实际结果。公众网站查询请使用“联系我们”页面或部门服务台。</p>
+</section>
+
+<footer>KMSPKS Codigo User Manual · Version 1.0 · View-only reference · 17 November 2026 · 中文/English</footer>
+</div>
+</body>
+</html>
